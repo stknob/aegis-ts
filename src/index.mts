@@ -19,7 +19,7 @@ const POLY = 0x11b; // 1 + x + x**3 + x**4 + x**8
 function mul2(n: number) {
     return (n << 1) ^ (POLY & -(n >> 7));
 }
-  
+
 function mul(a: number, b: number) {
     let res = 0;
     for (; b > 0; b >>= 1) {
@@ -29,7 +29,7 @@ function mul(a: number, b: number) {
     }
     return res;
 }
-  
+
 // AES S-box is generated using finite field inversion,
 // an affine transform, and xor of a constant 0x63.
 const sbox = /* @__PURE__ */ (() => {
@@ -45,9 +45,9 @@ const sbox = /* @__PURE__ */ (() => {
     clean(t);
     return box;
 })();
-  
+
 const rotl32_8 = (n: number) => (n << 8) | (n >>> 24);
-  
+
 // T-table is optimization suggested in 5.2 of original proposal (missed from FIPS-197). Changes:
 // - LE instead of BE
 // - bigger tables: T0 and T1 are merged into T01 table and T2 & T3 into T23;
@@ -69,7 +69,7 @@ function genTtable(sbox: Uint8Array, fn: (n: number) => number) {
     }
     return { T01, T23 };
 }
-  
+
 const tableEncoding = /* @__PURE__ */ genTtable(
     sbox,
     (s: number) => (mul(s, 3) << 24) | (s << 16) | (s << 8) | mul(s, 2)
@@ -93,9 +93,9 @@ type AESRoundResult = { t0: number, t1: number, t2: number, t3: number };
 
 /**
  * AES round function
- * @param inp 
- * @param rk 
- * @returns 
+ * @param inp
+ * @param rk
+ * @returns
  */
 function AESRound(inp: Uint32Array, rk: Uint32Array): AESRoundResult {
     const { T01, T23 } = tableEncoding;
@@ -109,7 +109,7 @@ function AESRound(inp: Uint32Array, rk: Uint32Array): AESRoundResult {
 }
 
 type Aegis256State = [Uint32Array, Uint32Array, Uint32Array, Uint32Array, Uint32Array, Uint32Array];
-class AegisDecryptionError extends Error {
+export class AegisInvalidTagError extends Error {
     constructor() { super("Aegis decryption failed") }
     get name() { return this.constructor.name; }
 }
@@ -132,9 +132,9 @@ function set128(out: Uint32Array, inp: AESRoundResult): Uint32Array {
 
 /**
  * Aegis256 state update function, extracted for testability
- * @param state 
- * @param msg 
- * @returns 
+ * @param state
+ * @param msg
+ * @returns
  */
 function aegis256_update(state: Aegis256State, msg: Uint32Array, tmp: Uint32Array): Aegis256State {
     const sm0 = AESRound(state[5], xor128(state[0], msg, tmp));
@@ -166,8 +166,8 @@ export class Aegis256 {
 
     /**
      * Splits a 256bit input block into two 128bit ones
-     * @param inp 
-     * @returns 
+     * @param inp
+     * @returns
      */
     #split128(inp: Uint8Array): Array<Uint32Array> {
         return [
@@ -199,7 +199,7 @@ export class Aegis256 {
 
     /**
      * Absorbs a full 128bit input block into the Aegis256 state
-     * @param ai 
+     * @param ai
      */
     #absorb(ai: Uint32Array) {
         aegis256_update(this.#state, ai, this.#sBlock32);
@@ -355,8 +355,8 @@ export class Aegis256 {
 
         const calculatedTag = prf.#finalize(ad_len, ct_len, new Uint8Array(tag.length));
         if (!equalBytes(tag, calculatedTag)) {
-            clean(dst32); // Wipe plaintext and state
-            throw new AegisDecryptionError();
+            clean(dst32); // Wipe plaintext
+            throw new AegisInvalidTagError();
         }
 
         return msg;
@@ -386,9 +386,9 @@ function xor256(a: Uint32Array, b: Uint32Array, out: Uint32Array): Uint32Array {
 
 /**
  * Aegis128L state update function with single 256bit input block, extracted for testability
- * @param state 
- * @param msg 
- * @returns 
+ * @param state
+ * @param msg
+ * @returns
  */
 function aegis128l_update1(state: Aegis128LState, msg: Uint32Array, tmp: Uint32Array): Aegis128LState {
     return aegis128l_update2(state, msg.subarray(0, 4), msg.subarray(4, 8), tmp);
@@ -396,9 +396,9 @@ function aegis128l_update1(state: Aegis128LState, msg: Uint32Array, tmp: Uint32A
 
 /**
  * Aegis128L state update function with two 128bit input blocks, extracted for testability
- * @param state 
- * @param msg 
- * @returns 
+ * @param state
+ * @param msg
+ * @returns
  */
 function aegis128l_update2(state: Aegis128LState, m0: Uint32Array, m1: Uint32Array, tmp: Uint32Array): Aegis128LState {
     const sm0 = AESRound(state[7], xor128(state[0], m0, tmp));
@@ -455,7 +455,7 @@ export class Aegis128L {
 
     /**
      * Absorbs a full 256bit input block into the Aegis128L state
-     * @param ai 
+     * @param ai
      */
     #absorb(ai: Uint32Array) {
         aegis128l_update1(this.#state, ai, this.#sBlock32);
@@ -463,9 +463,9 @@ export class Aegis128L {
 
     /**
      * Generate Z0, Z1 as a single 256bit block
-     * @param state 
-     * @param out 
-     * @returns 
+     * @param state
+     * @param out
+     * @returns
      */
     #genZ(state: Aegis128LState, out: Uint32Array): Uint32Array {
         // z0 = S6 ^ S1 ^ (S2 & S3)
@@ -560,7 +560,6 @@ export class Aegis128L {
         const ad_len    = ad.length;
         const ad_blocks = ad_len >>> 5;
         for (let i = 0, off = 0; i < ad_blocks; i++) {
-            // const block = prf.#pack128(ad.subarray(ad_pos, ad_pos + 32), prf.#tmpBlock);
             const block = ad32.subarray(off, off + 8)
             prf.#absorb(block);
             ad_pos += 32; off += 8;
@@ -624,387 +623,81 @@ export class Aegis128L {
 
         const calculatedTag = prf.#finalize(ad_len, ct_len, new Uint8Array(tag.length));
         if (!equalBytes(tag, calculatedTag)) {
-            clean(dst32); // Wipe plaintext and state
-            throw new AegisDecryptionError();
+            clean(dst32); // Wipe plaintext
+            throw new AegisInvalidTagError();
         }
 
         return msg;
     }
 }
 
+// (() => {
+//     const aesRoundIn = hexToBytes("000102030405060708090a0b0c0d0e0f");
+//     const aesRoundRk = hexToBytes("101112131415161718191a1b1c1d1e1f");
+//     const aesRoundRs = hexToBytes("7a7b4e5638782546a8c0477a3b813f43");
+
+//     const result = AESRound(u32(aesRoundIn), u32(aesRoundRk));
+//     const aesRoundOut = u8(Uint32Array.of(result.t0, result.t1, result.t2, result.t3));
+//     console.log(bytesToHex(aesRoundOut), equalBytes(aesRoundOut, aesRoundRs));
+// })();
 
 
+// (() => {
+//     // Aegis256 update check
+//     const message = "b165617ed04ab738afb2612c6d18a1ec";
+//     const beforeState = [
+//         "1fa1207ed76c86f2c4bb40e8b395b43e",
+//         "b44c375e6c1e1978db64bcd12e9e332f",
+//         "0dab84bfa9f0226432ff630f233d4e5b",
+//         "d7ef65c9b93e8ee60c75161407b066e7",
+//         "a760bb3da073fbd92bdc24734b1f56fb",
+//         "a828a18d6a964497ac6e7e53c5f55c73",
+//     ];
 
-(() => {
-    const aesRoundIn = hexToBytes("000102030405060708090a0b0c0d0e0f");
-    const aesRoundRk = hexToBytes("101112131415161718191a1b1c1d1e1f");
-    const aesRoundRs = hexToBytes("7a7b4e5638782546a8c0477a3b813f43");
+//     const afterState = [
+//         "e6bc643bae82dfa3d991b1b323839dcd",
+//         "648578232ba0f2f0a3677f617dc052c3",
+//         "ea788e0e572044a46059212dd007a789",
+//         "2f1498ae19b80da13fba698f088a8590",
+//         "a54c2ee95e8c2a2c3dae2ec743ae6b86",
+//         "a3240fceb68e32d5d114df1b5363ab67",
+//     ];
 
-    const result = AESRound(u32(aesRoundIn), u32(aesRoundRk));
-    const aesRoundOut = u8(Uint32Array.of(result.t0, result.t1, result.t2, result.t3));
-    console.log(bytesToHex(aesRoundOut), equalBytes(aesRoundOut, aesRoundRs));
-})();
+//     const inp = beforeState.map((v) => u32(hexToBytes(v))) as Aegis256State;
+//     const out = afterState.map((v) => u32(hexToBytes(v))) as Aegis256State;
+//     const msg = u32(hexToBytes(message));
+//     const result = aegis256_update(inp, msg, new Uint32Array(4));
+//     console.log("Aegis256", result.map((v, i) => equalBytes(u8(v), u8(out[i])) ));
+// })();
 
+// (() => {
+//     // Aegis128L update check
+//     const message = "033e6975b94816879e42917650955aa0";
+//     const beforeState = [
+//         "9b7e60b24cc873ea894ecc07911049a3",
+//         "330be08f35300faa2ebf9a7b0d274658",
+//         "7bbd5bd2b049f7b9b515cf26fbe7756c",
+//         "c35a00f55ea86c3886ec5e928f87db18",
+//         "9ebccafce87cab446396c4334592c91f",
+//         "58d83e31f256371e60fc6bb257114601",
+//         "1639b56ea322c88568a176585bc915de",
+//         "640818ffb57dc0fbc2e72ae93457e39a",
+//     ];
 
-(() => {
-    // Aegis256 update check
-    const message = "b165617ed04ab738afb2612c6d18a1ec";
-    const beforeState = [
-        "1fa1207ed76c86f2c4bb40e8b395b43e",
-        "b44c375e6c1e1978db64bcd12e9e332f",
-        "0dab84bfa9f0226432ff630f233d4e5b",
-        "d7ef65c9b93e8ee60c75161407b066e7",
-        "a760bb3da073fbd92bdc24734b1f56fb",
-        "a828a18d6a964497ac6e7e53c5f55c73",
-    ];
+//     const afterState = [
+//         "596ab773e4433ca0127c73f60536769d",
+//         "790394041a3d26ab697bde865014652d",
+//         "38cf49e4b65248acd533041b64dd0611",
+//         "16d8e58748f437bfff1797f780337cee",
+//         "69761320f7dd738b281cc9f335ac2f5a",
+//         "a21746bb193a569e331e1aa985d0d729",
+//         "09d714e6fcf9177a8ed1cde7e3d259a6",
+//         "61279ba73167f0ab76f0a11bf203bdff",
+//     ];
 
-    const afterState = [
-        "e6bc643bae82dfa3d991b1b323839dcd",
-        "648578232ba0f2f0a3677f617dc052c3",
-        "ea788e0e572044a46059212dd007a789",
-        "2f1498ae19b80da13fba698f088a8590",
-        "a54c2ee95e8c2a2c3dae2ec743ae6b86",
-        "a3240fceb68e32d5d114df1b5363ab67",
-    ];
-
-    const inp = beforeState.map((v) => u32(hexToBytes(v))) as Aegis256State;
-    const out = afterState.map((v) => u32(hexToBytes(v))) as Aegis256State;
-    const msg = u32(hexToBytes(message));
-    const result = aegis256_update(inp, msg, new Uint32Array(4));
-    console.log("Aegis256", result.map((v, i) => equalBytes(u8(v), u8(out[i])) ));
-})();
-
-(() => {
-    // Aegis128L update check
-    const message = "033e6975b94816879e42917650955aa0";
-    const beforeState = [
-        "9b7e60b24cc873ea894ecc07911049a3",
-        "330be08f35300faa2ebf9a7b0d274658",
-        "7bbd5bd2b049f7b9b515cf26fbe7756c",
-        "c35a00f55ea86c3886ec5e928f87db18",
-        "9ebccafce87cab446396c4334592c91f",
-        "58d83e31f256371e60fc6bb257114601",
-        "1639b56ea322c88568a176585bc915de",
-        "640818ffb57dc0fbc2e72ae93457e39a",
-    ];
-
-    const afterState = [
-        "596ab773e4433ca0127c73f60536769d",
-        "790394041a3d26ab697bde865014652d",
-        "38cf49e4b65248acd533041b64dd0611",
-        "16d8e58748f437bfff1797f780337cee",
-        "69761320f7dd738b281cc9f335ac2f5a",
-        "a21746bb193a569e331e1aa985d0d729",
-        "09d714e6fcf9177a8ed1cde7e3d259a6",
-        "61279ba73167f0ab76f0a11bf203bdff",
-    ];
-
-    const inp = beforeState.map((v) => u32(hexToBytes(v))) as Aegis128LState;
-    const out = afterState.map((v) => u32(hexToBytes(v))) as Aegis128LState;
-    const msg = u32(hexToBytes(message));
-    const result = aegis128l_update2(inp, msg, msg, new Uint32Array(8));
-    console.log("Aegis128L", result.map((v, i) => equalBytes(u8(v), u8(out[i])) ));
-})();
-
-
-const AEGIS128L_TEST_VECTORS = [{
-    // Aegis128L testvector #1
-    key:    hexToBytes("10010000000000000000000000000000"),
-    nonce:  hexToBytes("10000200000000000000000000000000"),
-    ad:     Uint8Array.from([]),
-    msg:    hexToBytes("00000000000000000000000000000000"),
-    ct:     hexToBytes("c1c0e58bd913006feba00f4b3cc3594e"),
-    tag128: hexToBytes("abe0ece80c24868a226a35d16bdae37a"),
-    tag256: hexToBytes("25835bfbb21632176cf03840687cb968cace4617af1bd0f7d064c639a5c79ee4"),
-    valid:  true,
-}, {
-    // Aegis128L testvector #2
-    key:    hexToBytes("10010000000000000000000000000000"),
-    nonce:  hexToBytes("10000200000000000000000000000000"),
-    ad:     Uint8Array.from([]),
-    msg:    Uint8Array.from([]),
-    ct:     Uint8Array.from([]),
-    tag128: hexToBytes("c2b879a67def9d74e6c14f708bbcc9b4"),
-    tag256: hexToBytes("1360dc9db8ae42455f6e5b6a9d488ea4f2184c4e12120249335c4ee84bafe25d"),
-    valid:  true,
-}, {
-    // Aegis128L testvector #3
-    key:    hexToBytes("10010000000000000000000000000000"),
-    nonce:  hexToBytes("10000200000000000000000000000000"),
-    ad:     hexToBytes("0001020304050607"),
-    msg:    hexToBytes("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"),
-    ct:     hexToBytes("79d94593d8c2119d7e8fd9b8fc77845c5c077a05b2528b6ac54b563aed8efe84"),
-    tag128: hexToBytes("cc6f3372f6aa1bb82388d695c3962d9a"),
-    tag256: hexToBytes("022cb796fe7e0ae1197525ff67e309484cfbab6528ddef89f17d74ef8ecd82b3"),
-    valid:  true,
-}, {
-    // Aegis128L testvector #4
-    key:    hexToBytes("10010000000000000000000000000000"),
-    nonce:  hexToBytes("10000200000000000000000000000000"),
-    ad:     hexToBytes("0001020304050607"),
-    msg:    hexToBytes("000102030405060708090a0b0c0d"),
-    ct:     hexToBytes("79d94593d8c2119d7e8fd9b8fc77"),
-    tag128: hexToBytes("5c04b3dba849b2701effbe32c7f0fab7"),
-    tag256: hexToBytes("86f1b80bfb463aba711d15405d094baf4a55a15dbfec81a76f35ed0b9c8b04ac"),
-    valid:  true,
-}, {
-    // Aegis128L testvector #5
-    key:    hexToBytes("10010000000000000000000000000000"),
-    nonce:  hexToBytes("10000200000000000000000000000000"),
-    ad:     hexToBytes("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20212223242526272829"),
-    msg:    hexToBytes("101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f3031323334353637"),
-    ct:     hexToBytes("b31052ad1cca4e291abcf2df3502e6bdb1bfd6db36798be3607b1f94d34478aa7ede7f7a990fec10"),
-    tag128: hexToBytes("7542a745733014f9474417b337399507"),
-    tag256: hexToBytes("b91e2947a33da8bee89b6794e647baf0fc835ff574aca3fc27c33be0db2aff98"),
-    valid:  true,
-}, {
-    // Aegis128L testvector #6
-    key:    hexToBytes("10010000000000000000000000000000"),
-    nonce:  hexToBytes("10000200000000000000000000000000"),
-    ad:     hexToBytes("0001020304050607"),
-    msg:    null,
-    ct:     hexToBytes("79d94593d8c2119d7e8fd9b8fc77"),
-    tag128: hexToBytes("5c04b3dba849b2701effbe32c7f0fab7"),
-    tag256: hexToBytes("86f1b80bfb463aba711d15405d094baf4a55a15dbfec81a76f35ed0b9c8b04ac"),
-    decryptOnly: true,
-    valid: false,
-}, {
-    // Aegis128L testvector #7
-    key:    hexToBytes("10010000000000000000000000000000"),
-    nonce:  hexToBytes("10000200000000000000000000000000"),
-    ad:     hexToBytes("0001020304050607"),
-    msg:    null,
-    ct:     hexToBytes("79d94593d8c2119d7e8fd9b8fc78"),
-    tag128: hexToBytes("5c04b3dba849b2701effbe32c7f0fab7"),
-    tag256: hexToBytes("86f1b80bfb463aba711d15405d094baf4a55a15dbfec81a76f35ed0b9c8b04ac"),
-    decryptOnly: true,
-    valid: false,
-}, {
-    // Aegis128L testvector #8
-    key:    hexToBytes("10010000000000000000000000000000"),
-    nonce:  hexToBytes("10000200000000000000000000000000"),
-    ad:     hexToBytes("0001020304050608"),
-    msg:    null,
-    ct:     hexToBytes("79d94593d8c2119d7e8fd9b8fc77"),
-    tag128: hexToBytes("5c04b3dba849b2701effbe32c7f0fab7"),
-    tag256: hexToBytes("86f1b80bfb463aba711d15405d094baf4a55a15dbfec81a76f35ed0b9c8b04ac"),
-    decryptOnly: true,
-    valid: false,
-}, {
-    // Aegis128L testvector #9
-    key:    hexToBytes("10010000000000000000000000000000"),
-    nonce:  hexToBytes("10000200000000000000000000000000"),
-    ad:     hexToBytes("0001020304050607"),
-    msg:    null,
-    ct:     hexToBytes("79d94593d8c2119d7e8fd9b8fc77"),
-    tag128: hexToBytes("6c04b3dba849b2701effbe32c7f0fab8"),
-    tag256: hexToBytes("86f1b80bfb463aba711d15405d094baf4a55a15dbfec81a76f35ed0b9c8b04ad"),
-    decryptOnly: true,
-    valid: false,
-}];
-
-const AEGIS256_TEST_VECTORS = [{
-    // Aegis256 testvector #1
-    key:    hexToBytes("1001000000000000000000000000000000000000000000000000000000000000"),
-    nonce:  hexToBytes("1000020000000000000000000000000000000000000000000000000000000000"),
-    ad:     Uint8Array.from([]),
-    msg:    hexToBytes("00000000000000000000000000000000"),
-    ct:     hexToBytes("754fc3d8c973246dcc6d741412a4b236"),
-    tag128: hexToBytes("3fe91994768b332ed7f570a19ec5896e"),
-    tag256: hexToBytes("1181a1d18091082bf0266f66297d167d2e68b845f61a3b0527d31fc7b7b89f13"),
-    valid:  true,
-}, {
-    // Aegis256 testvector #2
-    key:    hexToBytes("1001000000000000000000000000000000000000000000000000000000000000"),
-    nonce:  hexToBytes("1000020000000000000000000000000000000000000000000000000000000000"),
-    ad:     Uint8Array.from([]),
-    msg:    Uint8Array.from([]),
-    ct:     Uint8Array.from([]),
-    tag128: hexToBytes("e3def978a0f054afd1e761d7553afba3"),
-    tag256: hexToBytes("6a348c930adbd654896e1666aad67de989ea75ebaa2b82fb588977b1ffec864a"),
-    valid:  true,
-}, {
-    // Aegis256 testvector #3
-    key:    hexToBytes("1001000000000000000000000000000000000000000000000000000000000000"),
-    nonce:  hexToBytes("1000020000000000000000000000000000000000000000000000000000000000"),
-    ad:     hexToBytes("0001020304050607"),
-    msg:    hexToBytes("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"),
-    ct:     hexToBytes("f373079ed84b2709faee373584585d60accd191db310ef5d8b11833df9dec711"),
-    tag128: hexToBytes("8d86f91ee606e9ff26a01b64ccbdd91d"),
-    tag256: hexToBytes("b7d28d0c3c0ebd409fd22b44160503073a547412da0854bfb9723020dab8da1a"),
-    valid:  true,
-}, {
-    // Aegis256 testvector #4
-    key:    hexToBytes("1001000000000000000000000000000000000000000000000000000000000000"),
-    nonce:  hexToBytes("1000020000000000000000000000000000000000000000000000000000000000"),
-    ad:     hexToBytes("0001020304050607"),
-    msg:    hexToBytes("000102030405060708090a0b0c0d"),
-    ct:     hexToBytes("f373079ed84b2709faee37358458"),
-    tag128: hexToBytes("c60b9c2d33ceb058f96e6dd03c215652"),
-    tag256: hexToBytes("8c1cc703c81281bee3f6d9966e14948b4a175b2efbdc31e61a98b4465235c2d9"),
-    valid:  true,
-}, {
-    // Aegis256 testvector #5
-    key:    hexToBytes("1001000000000000000000000000000000000000000000000000000000000000"),
-    nonce:  hexToBytes("1000020000000000000000000000000000000000000000000000000000000000"),
-    ad:     hexToBytes("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20212223242526272829"),
-    msg:    hexToBytes("101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f3031323334353637"),
-    ct:     hexToBytes("57754a7d09963e7c787583a2e7b859bb24fa1e04d49fd550b2511a358e3bca252a9b1b8b30cc4a67"),
-    tag128: hexToBytes("ab8a7d53fd0e98d727accca94925e128"),
-    tag256: hexToBytes("a3aca270c006094d71c20e6910b5161c0826df233d08919a566ec2c05990f734"),
-    valid:  true,
-}, {
-    // Aegis256 testvector #6
-    key:    hexToBytes("1001000000000000000000000000000000000000000000000000000000000000"),
-    nonce:  hexToBytes("1000020000000000000000000000000000000000000000000000000000000000"),
-    ad:     hexToBytes("0001020304050607"),
-    msg:    null,
-    ct:     hexToBytes("f373079ed84b2709faee37358458"),
-    tag128: hexToBytes("c60b9c2d33ceb058f96e6dd03c215652"),
-    tag256: hexToBytes("8c1cc703c81281bee3f6d9966e14948b4a175b2efbdc31e61a98b4465235c2d9"),
-    decryptOnly: true,
-    valid: false,
-}, {
-    // Aegis256 testvector #7
-    key:    hexToBytes("1001000000000000000000000000000000000000000000000000000000000000"),
-    nonce:  hexToBytes("1000020000000000000000000000000000000000000000000000000000000000"),
-    ad:     hexToBytes("0001020304050607"),
-    msg:    null,
-    ct:     hexToBytes("f373079ed84b2709faee37358459"),
-    tag128: hexToBytes("c60b9c2d33ceb058f96e6dd03c215652"),
-    tag256: hexToBytes("8c1cc703c81281bee3f6d9966e14948b4a175b2efbdc31e61a98b4465235c2d9"),
-    decryptOnly: true,
-    valid: false,
-}, {
-    // Aegis256 testvector #8
-    key:    hexToBytes("1001000000000000000000000000000000000000000000000000000000000000"),
-    nonce:  hexToBytes("1000020000000000000000000000000000000000000000000000000000000000"),
-    ad:     hexToBytes("0001020304050608"),
-    msg:    null,
-    ct:     hexToBytes("f373079ed84b2709faee37358458"),
-    tag128: hexToBytes("c60b9c2d33ceb058f96e6dd03c215652"),
-    tag256: hexToBytes("8c1cc703c81281bee3f6d9966e14948b4a175b2efbdc31e61a98b4465235c2d9"),
-    decryptOnly: true,
-    valid: false,
-}, {
-    // Aegis256 testvector #9
-    key:    hexToBytes("1001000000000000000000000000000000000000000000000000000000000000"),
-    nonce:  hexToBytes("1000020000000000000000000000000000000000000000000000000000000000"),
-    ad:     hexToBytes("0001020304050607"),
-    msg:    null,
-    ct:     hexToBytes("f373079ed84b2709faee37358458"),
-    tag128: hexToBytes("c60b9c2d33ceb058f96e6dd03c215653"),
-    tag256: hexToBytes("8c1cc703c81281bee3f6d9966e14948b4a175b2efbdc31e61a98b4465235c2da"),
-    decryptOnly: true,
-    valid: false,
-}];
-
-function runAegisTestVectors(name, clazz, vectors) {
-    for (const [idx, desc] of vectors.entries()) {
-        if (!desc.decryptOnly) {
-            const [ct, tag256] = clazz.encrypt(desc.key, desc.nonce, desc.msg, desc.ad, 32);
-            const [__, tag128] = clazz.encrypt(desc.key, desc.nonce, desc.msg, desc.ad, 16);
-
-            if (!equalBytes(desc.ct, ct)) throw new Error(`${name} testvector #${idx + 1} failed ciphertext validation: expected '${bytesToHex(desc.ct)}' got '${bytesToHex(ct)}'`);
-            if (!equalBytes(desc.tag128, tag128)) throw new Error(`${name} testvector #${idx + 1} failed 128bit tag: expected '${bytesToHex(desc.tag128)}' got '${bytesToHex(tag128)}'`);
-            if (!equalBytes(desc.tag256, tag256)) throw new Error(`${name} testvector #${idx + 1} failed 256bit tag: expected '${bytesToHex(desc.tag256)}' got '${bytesToHex(tag256)}'`);
-        }
-
-        try {
-            const pt = clazz.decrypt(desc.key, desc.nonce, desc.ct, desc.ad, desc.tag256);
-            const isValid = pt && desc.msg ? equalBytes(pt, desc.msg) : false;
-            if (desc.valid && pt == null) throw new Error(`${name} testvector #${idx + 1} failed decryption w/ 256bit tag: expected '${bytesToHex(desc.msg)}' got 'null'`);
-            else if (desc.valid && !isValid) throw new Error(`${name} testvector #${idx + 1} failed decryption w/ 256bit tag: expected '${bytesToHex(desc.msg)}' got '${bytesToHex(pt)}'`);
-            else if (!desc.valid && isValid) throw new Error(`${name} testvector #${idx + 1} succeeded decryption w/ 256bit tag: expected 'rejected' got '${bytesToHex(pt)}'`);
-        } catch (err) {
-            if (err.name == "AegisDecryptionError") {
-                if (desc.valid) throw new Error(`${name} testvector #${idx + 1} failed decryption w/ 256bit tag: expected '${bytesToHex(desc.msg)}' got 'rejected'`, err);
-            } else {
-                throw new Error(`${name} testvector #${idx + 1} failed decryption w/ 256bit tag: expected '${desc.valid ? bytesToHex(desc.msg) : 'rejected'}' got 'error'`, err);
-            }
-        }
-
-        try {
-            const pt = clazz.decrypt(desc.key, desc.nonce, desc.ct, desc.ad, desc.tag128);
-            const isValid = pt && desc.msg ? equalBytes(pt, desc.msg) : false;
-            if (desc.valid && pt == null) throw new Error(`${name} testvector #${idx + 1} failed decryption w/ 128bit tag: expected '${bytesToHex(desc.msg)}' got 'null'`);
-            else if (desc.valid && !isValid) throw new Error(`${name} testvector #${idx + 1} failed decryption w/ 128bit tag: expected '${bytesToHex(desc.msg)}' got '${bytesToHex(pt)}'`);
-            else if (!desc.valid && isValid) throw new Error(`${name} testvector #${idx + 1} succeeded decryption w/ 128bit tag: expected 'rejected' got '${bytesToHex(pt)}'`);
-        } catch (err) {
-            if (err.name == "AegisDecryptionError") {
-                if (desc.valid) throw new Error(`${name} testvector #${idx + 1} failed decryption w/ 128bit tag: expected '${bytesToHex(desc.msg)}' got 'rejected'`, err);
-            } else {
-                throw new Error(`${name} testvector #${idx + 1} failed decryption w/ 128bit tag: expected '${desc.valid ? bytesToHex(desc.msg) : 'rejected'}' got 'error'`, err);
-            }
-        }
-    }
-}
-
-(() => {
-    runAegisTestVectors("Aegis128L", Aegis128L, AEGIS128L_TEST_VECTORS);
-    runAegisTestVectors("Aegis256",  Aegis256,  AEGIS256_TEST_VECTORS);
-})();
-
-
-const formatByteRate = (rate: number) => {
-    const units = ["iB", "KiB", "MiB", "GiB", "TiB", "PiB"];
-    const divisor = 1024;
-
-    let magnitude = 0;
-    while (rate >= divisor && magnitude < units.length) {
-        rate /= divisor;
-        magnitude++;
-    }
-
-    /* Limit to one digit */
-    rate = Math.floor(rate * 10) / 10;
-    return `${rate <= 0 ? "-" : rate} ${units[magnitude]}/s`;
-};
-
-console.log("\n--------------------------------------------------------------------------------------\n");
-
-(() => {
-    // Aegis128L benchmark
-    const key   = hexToBytes("10010000000000000000000000000000");
-    const nonce = hexToBytes("10000200000000000000000000000000");
-    const msg   = new Uint8Array(64);
-    const ad    = hexToBytes("0001020304050607");
-    const [ct, tag] = Aegis128L.encrypt(key, nonce, msg, ad);
-
-    const rounds = 1_000_000;
-    const start = Date.now();
-    for (let i = 0; i < rounds; i++) {
-        const pt = Aegis128L.decrypt(key, nonce, ct, ad, tag);
-        if (!equalBytes(msg, pt)) throw new Error("foobar");
-    }
-    const msec = Date.now() - start;
-
-    const msec_per_op = msec / rounds;
-    const ops_per_sec = 1000 / msec_per_op;
-    console.log("Aegis128L@%d: %d ms => %s msec/op (%s ops/s) = %s",
-        msg.length, msec, msec_per_op.toFixed(3), ops_per_sec.toFixed(2),
-        formatByteRate(msg.length * ops_per_sec));
-})();
-
-(() => {
-    // Aegis256 benchmark
-    const key   = hexToBytes("1001000000000000000000000000000000000000000000000000000000000000");
-    const nonce = hexToBytes("1000020000000000000000000000000000000000000000000000000000000000");
-    const msg   = new Uint8Array(64);
-    const ad    = hexToBytes("0001020304050607");
-    const [ct, tag] = Aegis256.encrypt(key, nonce, msg, ad);
-
-    const rounds = 1_000_000;
-    const start = Date.now();
-    for (let i = 0; i < rounds; i++) {
-        const pt = Aegis256.decrypt(key, nonce, ct, ad, tag);
-        if (!equalBytes(msg, pt)) throw new Error("foobar");
-    }
-    const msec = Date.now() - start;
-
-    const msec_per_op = msec / rounds;
-    const ops_per_sec = 1000 / msec_per_op;
-    console.log("Aegis256@%d: %d ms => %s msec/op (%s ops/s) = %s",
-        msg.length, msec, msec_per_op.toFixed(3), ops_per_sec.toFixed(2),
-        formatByteRate(msg.length * ops_per_sec));
-})();
+//     const inp = beforeState.map((v) => u32(hexToBytes(v))) as Aegis128LState;
+//     const out = afterState.map((v) => u32(hexToBytes(v))) as Aegis128LState;
+//     const msg = u32(hexToBytes(message));
+//     const result = aegis128l_update2(inp, msg, msg, new Uint32Array(8));
+//     console.log("Aegis128L", result.map((v, i) => equalBytes(u8(v), u8(out[i])) ));
+// })();
