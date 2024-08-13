@@ -1,0 +1,18 @@
+{
+  "name": "poc-aegis",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@types/node": "20.15.1",
+    "@noble/ciphers": "0.6.0",
+    "glob": "11.0.0",
+    "ts-node": "10.9.2",
+    "typescript": "5.5.4"
+  },
+  "scripts": {
+    "run": "node --loader ts-node/esm src/index.mts",
+    "test": "node --loader ts-node/esm test/index.mts",
+    "prof": "node --prof --loader ts-node/esm src/index.mts"
+  }
+}
