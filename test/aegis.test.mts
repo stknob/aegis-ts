@@ -2,7 +2,7 @@ import { hexToBytes, u32, u8 } from "@noble/ciphers/utils";
 import assert from "node:assert";
 import suite from "node:test";
 
-import { AESRound } from "../src/_aegis.mjs";
+import { AESRound } from "../src/_aes.mjs";
 
 suite("aegis", async (s) => {
     await s.test("AESRound", () => {

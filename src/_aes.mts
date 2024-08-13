@@ -75,3 +75,22 @@ export function apply0123(
         T23[((s2 >>> 8) & 0xff00) | ((s3 >>> 24) & 0xff)]
     );
 }
+
+export type AESRoundResult = { t0: number, t1: number, t2: number, t3: number };
+
+/**
+ * AES round function
+ * @param inp
+ * @param rk
+ * @returns
+ */
+export function AESRound(inp: Uint32Array, rk: Uint32Array): AESRoundResult {
+    const { T01, T23 } = tableEncoding;
+    const [s0, s1, s2, s3] = inp;
+
+    const t0 = rk[0] ^ apply0123(T01, T23, s0, s1, s2, s3);
+    const t1 = rk[1] ^ apply0123(T01, T23, s1, s2, s3, s0);
+    const t2 = rk[2] ^ apply0123(T01, T23, s2, s3, s0, s1);
+    const t3 = rk[3] ^ apply0123(T01, T23, s3, s0, s1, s2);
+    return { t0, t1, t2, t3 };
+}

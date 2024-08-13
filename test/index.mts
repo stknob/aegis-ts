@@ -4,7 +4,7 @@ import { run } from "node:test";
 import { globSync } from "glob";
 
 run({
-	files: globSync("test/**/*.test.mts"),
+	files: globSync("test/**/*.test.mts").sort((a, b) => String.prototype.localeCompare.call(a, b)),
 	concurrency: false,
 })
 .on('test:fail', () => { process.exitCode = 1; })
