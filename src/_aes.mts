@@ -1,3 +1,11 @@
+/**
+ * This file contains code from the noble-ciphers project:
+ *
+ * Copyright (c) 2022 Paul Miller (https://paulmillr.com)
+ * Copyright (c) 2016 Thomas Pornin <pornin@bolet.org>
+ *
+ * License: MIT
+ */
 import { clean } from "./_utils.mjs";
 
 const POLY = 0x11b; // 1 + x + x**3 + x**4 + x**8
