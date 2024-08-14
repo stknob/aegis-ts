@@ -12,6 +12,7 @@
     "typescript": "5.5.4"
   },
   "scripts": {
+    "build": "npx tsc",
     "run": "node --loader ts-node/esm src/index.mts",
     "test": "node --loader ts-node/esm test/index.mts",
     "prof": "node --prof --loader ts-node/esm src/index.mts",

@@ -2,8 +2,12 @@
     "compilerOptions": {
         "target": "ES2022",
         "moduleResolution": "NodeNext",
-        "module": "NodeNext"
+        "module": "NodeNext",
+        "outDir": "dist/"
     },
+    "include": [
+        "src/"
+    ],
     "exclude": [
         "node_modules"
     ]
