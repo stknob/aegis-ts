@@ -1,6 +1,6 @@
 
 import { equalBytes } from "@noble/ciphers/utils";
-import { clean, u32, u8 } from "./_utils.mjs";
+import { clean, u32, u32_aligned, u8 } from "./_utils.mjs";
 import { aegis128l_update1, aegis128l_update2, Aegis128LState, aegis256_update, Aegis256State, xor128, xor256 } from "./_aegis.mjs";
 
 const C0 = new Uint32Array(Uint8Array.of(0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x08, 0x0d, 0x15, 0x22, 0x37, 0x59, 0x90, 0xe9, 0x79, 0x62).buffer);
@@ -27,9 +27,12 @@ export class Aegis256 {
      * @returns
      */
     #split128(inp: Uint8Array): Array<Uint32Array> {
+        const tmp = u32_aligned(inp);
         return [
-            new Uint32Array(inp.buffer,  0, 4),
-            new Uint32Array(inp.buffer, 16, 4),
+            tmp.subarray(0, 4),
+            tmp.subarray(4, 8),
+            // new Uint32Array(tmp.buffer,  0, 4),
+            // new Uint32Array(tmp.buffer, 16, 4),
         ];
     }
 
@@ -141,8 +144,8 @@ export class Aegis256 {
         const ct  = new Uint8Array(msg.length);
         const tag = new Uint8Array(tag_len);
 
-        const ad32  = u32(ad);
-        const src32 = u32(msg);
+        const ad32  = u32_aligned(ad);
+        const src32 = u32_aligned(msg);
         const dst32 = u32(ct);
 
         let ad_pos = 0;
@@ -182,8 +185,8 @@ export class Aegis256 {
         const prf = new this(key, nonce);
         const msg = new Uint8Array(ct.length);
 
-        const ad32  = u32(ad);
-        const src32 = u32(ct);
+        const ad32  = u32_aligned(ad);
+        const src32 = u32_aligned(ct);
         const dst32 = u32(msg);
 
         let ad_pos = 0;
@@ -234,8 +237,8 @@ export class Aegis128L {
     }
 
     #init(key: Uint8Array, nonce: Uint8Array) {
-        const k = u32(key);
-        const n = u32(nonce);
+        const k = u32_aligned(key);
+        const n = u32_aligned(nonce);
 
         this.#state = [
             xor128(k,  n, new Uint32Array(4)),
@@ -352,8 +355,8 @@ export class Aegis128L {
         const ct  = new Uint8Array(msg.length);
         const tag = new Uint8Array(tag_len);
 
-        const ad32  = u32(ad);
-        const src32 = u32(msg);
+        const ad32  = u32_aligned(ad);
+        const src32 = u32_aligned(msg);
         const dst32 = u32(ct);
 
         let ad_pos = 0;
@@ -393,8 +396,8 @@ export class Aegis128L {
         const prf = new this(key, nonce);
         const msg = new Uint8Array(ct.length);
 
-        const ad32  = u32(ad);
-        const src32 = u32(ct);
+        const ad32  = u32_aligned(ad);
+        const src32 = u32_aligned(ct);
         const dst32 = u32(msg);
 
         let ad_pos = 0;

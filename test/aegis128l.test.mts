@@ -137,4 +137,22 @@ suite("aegis128l", async (s) => {
 
         runAegisTestVectors("aegis128l", Aegis128L, AEGIS128L_TEST_VECTORS);
     });
+
+    await s.test("misaligned parameters", () => {
+        const key =    hexToBytes("0F10010000000000000000000000000000").subarray(1);
+        const nonce =  hexToBytes("0F10000200000000000000000000000000").subarray(1);
+        const ad =     hexToBytes("0F0001020304050607").subarray(1);
+        const msg =    hexToBytes("0F000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f").subarray(1);
+        const ct =     hexToBytes("0F79d94593d8c2119d7e8fd9b8fc77845c5c077a05b2528b6ac54b563aed8efe84").subarray(1);
+        const tag128 = hexToBytes("0Fcc6f3372f6aa1bb82388d695c3962d9a").subarray(1);
+        const tag256 = hexToBytes("0F022cb796fe7e0ae1197525ff67e309484cfbab6528ddef89f17d74ef8ecd82b3").subarray(1);
+
+        assert.doesNotThrow(() => {
+            const [actual_ct, actual_tag] = Aegis128L.encrypt(key, nonce, msg, ad);
+            assert.deepStrictEqual(actual_ct, ct, "ciphertext does not match expected");
+            assert.deepStrictEqual(actual_tag, tag256, "encryption tag does not match expected");
+            const actual_msg = Aegis128L.decrypt(key, nonce, ct, ad, tag256);
+            assert.deepStrictEqual(actual_msg, msg, "plaintext does not match expected");
+        }, RangeError);
+    });
 });

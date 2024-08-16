@@ -11,10 +11,10 @@ const PARAMS = [
     [1024*1024, 1_000],
 ];
 
-(async () => {
+await bench.run(null, async () => {
     const key   = new Uint8Array(16);
     const nonce = new Uint8Array(16);
-    const ad    = Uint8Array.from([]);
+    const ad    = new Uint8Array(16);
 
     for (const [size, samples] of PARAMS) {
         const [ct, tag] = Aegis128L.encrypt(key, nonce, new Uint8Array(size), ad, 32);
@@ -22,12 +22,12 @@ const PARAMS = [
             Aegis128L.decrypt(key, nonce, ct, ad, tag);
         });
     }
-})();
+});
 
-(async () => {
+await bench.run(null, async () => {
     const key   = new Uint8Array(32);
     const nonce = new Uint8Array(32);
-    const ad    = Uint8Array.from([]);
+    const ad    = new Uint8Array(16);
 
     for (const [size, samples] of PARAMS) {
         const [ct, tag] = Aegis256.encrypt(key, nonce, new Uint8Array(size), ad, 32);
@@ -35,4 +35,35 @@ const PARAMS = [
             Aegis256.decrypt(key, nonce, ct, ad, tag);
         });
     }
-})();
+});
+
+await bench.run(null, async () => {
+    const key   = new Uint8Array(16);
+    const nonce = new Uint8Array(16);
+    const ad    = new Uint8Array(16);
+
+    for (const [size, samples] of PARAMS) {
+        const [ct, tag] = Aegis128L.encrypt(key, nonce, new Uint8Array(size), ad, 32);
+        const ct_unaligned = new Uint8Array(ct.length + 1).subarray(1); ct_unaligned.set(ct);
+        const nonce_unaligned = new Uint8Array(nonce.length + 1).subarray(1); nonce_unaligned.set(nonce);
+        await bench.mark(`aegis128l misaligned nonce + ct @ ${size}`, samples, () => {
+            Aegis128L.decrypt(key, nonce_unaligned, ct_unaligned, ad, tag);
+        });
+    }
+});
+
+
+await bench.run(null, async () => {
+    const key   = new Uint8Array(32);
+    const nonce = new Uint8Array(32);
+    const ad    = new Uint8Array(16);
+
+    for (const [size, samples] of PARAMS) {
+        const [ct, tag] = Aegis256.encrypt(key, nonce, new Uint8Array(size), ad, 32);
+        const ct_unaligned = new Uint8Array(ct.length + 1).subarray(1); ct_unaligned.set(ct);
+        const nonce_unaligned = new Uint8Array(nonce.length + 1).subarray(1); nonce_unaligned.set(nonce);
+        await bench.mark(`aegis256 misaligned nonce + ct @ ${size}`, samples, () => {
+            Aegis256.decrypt(key, nonce_unaligned, ct_unaligned, ad, tag);
+        });
+    }
+});
