@@ -1,5 +1,6 @@
 import * as bench from 'micro-bmark';
 import { Aegis128L, Aegis256 } from '../src/index.mjs';
+import { MD5 } from '../src/md5.mjs';
 
 const PARAMS = [
     [16, 1_000_000],
@@ -10,6 +11,15 @@ const PARAMS = [
     [1024, 100_000],
     [1024*1024, 1_000],
 ];
+
+await bench.run(null, async () => {
+    for (const [size, samples] of PARAMS) {
+        const msg = new Uint8Array(size);
+        await bench.mark(`md5  @ ${size}`, samples, () => {
+            MD5.digest(msg);
+        });
+    }
+});
 
 await bench.run(null, async () => {
     const key   = new Uint8Array(16);
