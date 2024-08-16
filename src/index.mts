@@ -1,14 +1,23 @@
 
-import { equalBytes } from "@noble/ciphers/utils";
-import { clean, u32, u32_aligned, u8 } from "./_utils.mjs";
+import { copyBytes, createView, equalBytes, setBigUint64 } from "@noble/ciphers/utils";
+import { clean, isAligned32, u32, u8 } from "./_utils.mjs";
 import { aegis128l_update1, aegis128l_update2, Aegis128LState, aegis256_update, Aegis256State, xor128, xor256 } from "./_aegis.mjs";
 
 const C0 = new Uint32Array(Uint8Array.of(0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x08, 0x0d, 0x15, 0x22, 0x37, 0x59, 0x90, 0xe9, 0x79, 0x62).buffer);
 const C1 = new Uint32Array(Uint8Array.of(0xdb, 0x3d, 0x18, 0x55, 0x6d, 0xc2, 0x2f, 0xf1, 0x20, 0x11, 0x31, 0x42, 0x73, 0xb5, 0x28, 0xdd).buffer);
+
 export class AegisInvalidTagError extends Error {
     constructor() { super("Aegis decryption failed") }
     get name() { return this.constructor.name; }
 }
+
+const u64BitLengths = (ad_nbits: bigint, ct_nbits: bigint) => {
+    const num = new Uint8Array(16);
+    const view = createView(num);
+    setBigUint64(view, 0, ad_nbits, true);
+    setBigUint64(view, 8, ct_nbits, true);
+    return num;
+};
 
 export class Aegis256 {
     #state: Aegis256State;
@@ -27,17 +36,18 @@ export class Aegis256 {
      * @returns
      */
     #split128(inp: Uint8Array): Array<Uint32Array> {
-        const tmp = u32_aligned(inp);
         return [
-            tmp.subarray(0, 4),
-            tmp.subarray(4, 8),
-            // new Uint32Array(tmp.buffer,  0, 4),
-            // new Uint32Array(tmp.buffer, 16, 4),
+            new Uint32Array(inp.buffer,  0, 4),
+            new Uint32Array(inp.buffer, 16, 4),
         ];
     }
 
     #init(key: Uint8Array, nonce: Uint8Array) {
+        const toClean = [];
+        if (!isAligned32(key)) toClean.push((key = copyBytes(key)));
         const [k0, k1] = this.#split128(key);
+
+        if (!isAligned32(nonce)) toClean.push((nonce = copyBytes(nonce)));
         const [n0, n1] = this.#split128(nonce);
 
         this.#state = [
@@ -55,6 +65,8 @@ export class Aegis256 {
             aegis256_update(this.#state, xor128(k0, n0, this.#tmpBlock32), this.#sBlock32);
             aegis256_update(this.#state, xor128(k1, n1, this.#tmpBlock32), this.#sBlock32);
         }
+
+        clean(...toClean);
     }
 
     /**
@@ -98,9 +110,9 @@ export class Aegis256 {
         return out;
     }
 
-    #finalize(ad_len: number, msg_len: number, tag: Uint8Array): Uint8Array {
+    #finalize(ad_len: number, msg_len: number, tag_len: number): Uint8Array {
         // LE64(ad_len_bits) || LE64(msg_len_bits)
-        const tmp = BigUint64Array.of(BigInt(ad_len) << 3n, BigInt(msg_len) << 3n);
+        const tmp = u64BitLengths(BigInt(ad_len) << 3n, BigInt(msg_len) << 3n);
         this.#tmpBlock32.set(new Uint32Array(tmp.buffer, tmp.byteOffset, tmp.byteLength >>> 2));
 
         // t = S3 ^ (LE64(ad_len_bits) || LE64(msg_len_bits))
@@ -112,6 +124,7 @@ export class Aegis256 {
 
         clean(this.#tmpBlock32, this.#sBlock32, this.#zBlock32);
 
+        const tag = new Uint8Array(tag_len);
         const tag32 = u32(tag);
         if (tag.length === 16) {
             // tag = S0 ^ S1 ^ S2 ^ S3 ^ S4 ^ S5
@@ -136,16 +149,19 @@ export class Aegis256 {
         return tag;
     }
 
-    static encrypt(key: Uint8Array, nonce: Uint8Array, msg: Uint8Array, ad: Uint8Array, tag_len: number = 32): [Uint8Array, Uint8Array] {
-        if (tag_len != 16 && tag_len != 32) throw new Error("Invalid tag length: 16 or 32 bytes expected");
+    static encrypt(key: Uint8Array, nonce: Uint8Array, pt: Uint8Array, ad: Uint8Array, tag_len: number = 32): [Uint8Array, Uint8Array] {
+        if (![16, 32].includes(tag_len)) throw new Error("Invalid tag length: 16 or 32 bytes expected");
         else if (nonce.length != 32) throw new Error("Invalid nonce length: 32 byte expected");
 
         const prf = new this(key, nonce);
-        const ct  = new Uint8Array(msg.length);
-        const tag = new Uint8Array(tag_len);
+        const ct  = new Uint8Array(pt.length);
 
-        const ad32  = u32_aligned(ad);
-        const src32 = u32_aligned(msg);
+        const toClean = [];
+        if (!isAligned32(pt)) toClean.push((pt = copyBytes(pt)));
+        if (!isAligned32(ad)) toClean.push((ad = copyBytes(ad)));
+
+        const ad32  = u32(ad);
+        const src32 = u32(pt);
         const dst32 = u32(ct);
 
         let ad_pos = 0;
@@ -161,32 +177,37 @@ export class Aegis256 {
             prf.#absorb(prf.#tmpBlock32);
         }
 
-        let msg_pos = 0;
-        const msg_len    = msg.length;
-        const msg_blocks = msg_len >>> 4;
-        for (let i = 0, off = 0; i < msg_blocks; i++) {
+        let pt_pos = 0;
+        const pt_len    = pt.length;
+        const pt_blocks = pt_len >>> 4;
+        for (let i = 0, off = 0; i < pt_blocks; i++) {
             prf.#encBlock(src32.subarray(off, off + 4), dst32.subarray(off, off + 4));
-            msg_pos += 16; off += 4;
+            pt_pos += 16; off += 4;
         }
-        if (msg_pos < msg_len) {
-            prf.#tmpBlock8.fill(0).set(msg.subarray(msg_pos, msg_len));  // ZeroPad(msg, 128)
+        if (pt_pos < pt_len) {
+            prf.#tmpBlock8.fill(0).set(pt.subarray(pt_pos, pt_len));  // ZeroPad(pt, 128)
             prf.#encBlock(prf.#tmpBlock32, prf.#tmpBlock32);
-            ct.set(prf.#tmpBlock8.subarray(0, msg_len - msg_pos), msg_pos);
+            ct.set(prf.#tmpBlock8.subarray(0, pt_len - pt_pos), pt_pos);
         }
 
-        prf.#finalize(ad_len, msg_len, tag);
+        const tag = prf.#finalize(ad_len, pt_len, tag_len);
+        clean(...toClean);
         return [ct, tag];
     }
 
     static decrypt(key: Uint8Array, nonce: Uint8Array, ct: Uint8Array, ad: Uint8Array, tag: Uint8Array): Uint8Array {
-        if (tag.length != 16 && tag.length != 32) throw new Error("Invalid tag length: 16 or 32 bytes expected");
+        if (![16, 32].includes(tag.length)) throw new Error("Invalid tag length: 16 or 32 bytes expected");
         else if (nonce.length != 32) throw new Error("Invalid nonce length: 32 byte expected");
 
         const prf = new this(key, nonce);
         const msg = new Uint8Array(ct.length);
 
-        const ad32  = u32_aligned(ad);
-        const src32 = u32_aligned(ct);
+        const toClean = [];
+        if (!isAligned32(ct)) toClean.push((ct = copyBytes(ct)));
+        if (!isAligned32(ad)) toClean.push((ad = copyBytes(ad)));
+
+        const ad32  = u32(ad);
+        const src32 = u32(ct);
         const dst32 = u32(msg);
 
         let ad_pos = 0;
@@ -213,12 +234,13 @@ export class Aegis256 {
             prf.#decPartial(ct.subarray(ct_pos, ct_len), msg.subarray(ct_pos));
         }
 
-        const calculatedTag = prf.#finalize(ad_len, ct_len, new Uint8Array(tag.length));
+        const calculatedTag = prf.#finalize(ad_len, ct_len, tag.length);
         if (!equalBytes(tag, calculatedTag)) {
-            clean(dst32); // Wipe plaintext
+            clean(dst32, ...toClean); // Wipe plaintext
             throw new AegisInvalidTagError();
         }
 
+        clean(...toClean);
         return msg;
     }
 }
@@ -237,8 +259,12 @@ export class Aegis128L {
     }
 
     #init(key: Uint8Array, nonce: Uint8Array) {
-        const k = u32_aligned(key);
-        const n = u32_aligned(nonce);
+        const toClean = [];
+        if (!isAligned32(key)) toClean.push((key = copyBytes(key)));
+        if (!isAligned32(nonce)) toClean.push((nonce = copyBytes(nonce)));
+
+        const k = u32(key);
+        const n = u32(nonce);
 
         this.#state = [
             xor128(k,  n, new Uint32Array(4)),
@@ -254,6 +280,8 @@ export class Aegis128L {
         for (let i = 0; i < 10; i++) {
             aegis128l_update2(this.#state, n, k, this.#sBlock32);
         }
+
+        clean(...toClean);
     }
 
     /**
@@ -309,7 +337,7 @@ export class Aegis128L {
         return out;
     }
 
-    #finalize(ad_len: number, msg_len: number, tag: Uint8Array): Uint8Array {
+    #finalize(ad_len: number, msg_len: number, tag_len: number): Uint8Array {
         // LE64(ad_len_bits) || LE64(msg_len_bits)
         const tmp = BigUint64Array.of(BigInt(ad_len) << 3n, BigInt(msg_len) << 3n);
         this.#tmpBlock32.set(new Uint32Array(tmp.buffer, tmp.byteOffset, tmp.byteLength >>> 2), 0);
@@ -323,6 +351,7 @@ export class Aegis128L {
 
         clean(this.#tmpBlock32, this.#sBlock32, this.#zBlock32);
 
+        const tag = new Uint8Array(tag_len);
         const tag32 = u32(tag);
         if (tag.length === 16) {
             // tag = S0 ^ S1 ^ S2 ^ S3 ^ S4 ^ S5 ^ S6
@@ -347,16 +376,19 @@ export class Aegis128L {
         return tag;
     }
 
-    static encrypt(key: Uint8Array, nonce: Uint8Array, msg: Uint8Array, ad: Uint8Array, tag_len: number = 32): [Uint8Array, Uint8Array] {
-        if (tag_len != 16 && tag_len != 32) throw new Error("Invalid tag length: 16 or 32 bytes expected");
+    static encrypt(key: Uint8Array, nonce: Uint8Array, pt: Uint8Array, ad: Uint8Array, tag_len: number = 32): [Uint8Array, Uint8Array] {
+        if (![16, 32].includes(tag_len)) throw new Error("Invalid tag length: 16 or 32 bytes expected");
         else if (nonce.length != 16) throw new Error("Invalid nonce length: 16 byte expected");
 
         const prf = new this(key, nonce);
-        const ct  = new Uint8Array(msg.length);
-        const tag = new Uint8Array(tag_len);
+        const ct  = new Uint8Array(pt.length);
 
-        const ad32  = u32_aligned(ad);
-        const src32 = u32_aligned(msg);
+        const toClean = [];
+        if (!isAligned32(pt)) toClean.push((pt = copyBytes(pt)));
+        if (!isAligned32(ad)) toClean.push((ad = copyBytes(ad)));
+
+        const ad32  = u32(ad);
+        const src32 = u32(pt);
         const dst32 = u32(ct);
 
         let ad_pos = 0;
@@ -372,32 +404,37 @@ export class Aegis128L {
             prf.#absorb(prf.#tmpBlock32);
         }
 
-        let msg_pos = 0;
-        const msg_len    = msg.length;
-        const msg_blocks = msg_len >>> 5;
-        for (let i = 0, off = 0; i < msg_blocks; i++) {
+        let pt_pos = 0;
+        const pt_len    = pt.length;
+        const pt_blocks = pt_len >>> 5;
+        for (let i = 0, off = 0; i < pt_blocks; i++) {
             prf.#encBlock(src32.subarray(off, off + 8), dst32.subarray(off, off + 8));
-            msg_pos += 32; off += 8;
+            pt_pos += 32; off += 8;
         }
-        if (msg_pos < msg_len) {
-            prf.#tmpBlock8.fill(0).set(msg.subarray(msg_pos, msg_len));  // ZeroPad(msg, 128)
+        if (pt_pos < pt_len) {
+            prf.#tmpBlock8.fill(0).set(pt.subarray(pt_pos, pt_len));  // ZeroPad(pt, 128)
             prf.#encBlock(prf.#tmpBlock32, prf.#tmpBlock32);
-            ct.set(prf.#tmpBlock8.subarray(0, msg_len - msg_pos), msg_pos);
+            ct.set(prf.#tmpBlock8.subarray(0, pt_len - pt_pos), pt_pos);
         }
 
-        prf.#finalize(ad_len, msg_len, tag);
+        const tag = prf.#finalize(ad_len, pt_len, tag_len);
+        clean(...toClean);
         return [ct, tag];
     }
 
     static decrypt(key: Uint8Array, nonce: Uint8Array, ct: Uint8Array, ad: Uint8Array, tag: Uint8Array): Uint8Array {
-        if (tag.length != 16 && tag.length != 32) throw new Error("Invalid tag length: 16 or 32 bytes expected");
+        if (![16, 32].includes(tag.length)) throw new Error("Invalid tag length: 16 or 32 bytes expected");
         else if (nonce.length != 16) throw new Error("Invalid nonce length: 16 byte expected");
 
         const prf = new this(key, nonce);
         const msg = new Uint8Array(ct.length);
 
-        const ad32  = u32_aligned(ad);
-        const src32 = u32_aligned(ct);
+        const toClean = [];
+        if (!isAligned32(ct)) toClean.push((ct = copyBytes(ct)));
+        if (!isAligned32(ad)) toClean.push((ad = copyBytes(ad)));
+
+        const ad32  = u32(ad);
+        const src32 = u32(ct);
         const dst32 = u32(msg);
 
         let ad_pos = 0;
@@ -424,12 +461,13 @@ export class Aegis128L {
             prf.#decPartial(ct.subarray(ct_pos, ct_len), msg.subarray(ct_pos));
         }
 
-        const calculatedTag = prf.#finalize(ad_len, ct_len, new Uint8Array(tag.length));
+        const calculatedTag = prf.#finalize(ad_len, ct_len, tag.length);
         if (!equalBytes(tag, calculatedTag)) {
-            clean(dst32); // Wipe plaintext
+            clean(dst32, ...toClean); // Wipe plaintext
             throw new AegisInvalidTagError();
         }
 
+        clean(...toClean);
         return msg;
     }
 }
