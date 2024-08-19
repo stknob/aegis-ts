@@ -1,11 +1,11 @@
 import assert from "node:assert";
 import { AegisInvalidTagError } from "../src/index.mjs";
 
-export function runAegisTestVectors(name, clazz, vectors) {
+export function runAegisTestVectors(name, cipher, vectors) {
     for (const [idx, desc] of vectors.entries()) {
         if (!desc.decryptOnly) {
-            const [ct, tag256] = clazz.encrypt(desc.key, desc.nonce, desc.msg, desc.ad, 32);
-            const [__, tag128] = clazz.encrypt(desc.key, desc.nonce, desc.msg, desc.ad, 16);
+            const [ct, tag256] = cipher(desc.key, desc.nonce, { tagLength: 32 }).encrypt_detached(desc.msg, desc.ad);
+            const [__, tag128] = cipher(desc.key, desc.nonce, { tagLength: 16 }).encrypt_detached(desc.msg, desc.ad);
 
             assert.deepStrictEqual(ct, desc.ct, `${name} testvector #${idx + 1} failed ciphertext validation`);
             assert.deepStrictEqual(tag128, desc.tag128, `${name} testvector #${idx + 1} failed 128bit tag`);
@@ -15,12 +15,12 @@ export function runAegisTestVectors(name, clazz, vectors) {
         // Decryption w/ 128bit tag
         if (desc.valid) {
             let pt = null;
-            assert.doesNotThrow(() => { pt = clazz.decrypt(desc.key, desc.nonce, desc.ct, desc.ad, desc.tag128); }, AegisInvalidTagError,
+            assert.doesNotThrow(() => { pt = cipher(desc.key, desc.nonce).decrypt_detached(desc.ct, desc.tag128, desc.ad); }, AegisInvalidTagError,
                 `${name} testvector #${idx + 1} failed decryption w/ 128bit tag`);
             assert.deepStrictEqual(pt, desc.msg, `${name} testvector #${idx + 1} failed decryption w/ 128bit tag`);
         } else {
             let pt = null;
-            assert.throws(() => { pt = clazz.decrypt(desc.key, desc.nonce, desc.ct, desc.ad, desc.tag128); }, AegisInvalidTagError,
+            assert.throws(() => { pt = cipher(desc.key, desc.nonce).decrypt_detached(desc.ct, desc.tag128, desc.ad); }, AegisInvalidTagError,
                 `${name} testvector #${idx + 1} succeeded decryption w/ 128bit tag`);
             assert.deepStrictEqual(pt, desc.msg);
         }
@@ -28,12 +28,12 @@ export function runAegisTestVectors(name, clazz, vectors) {
         // Decryption w/ 256bit tag
         if (desc.valid) {
             let pt = null;
-            assert.doesNotThrow(() => { pt = clazz.decrypt(desc.key, desc.nonce, desc.ct, desc.ad, desc.tag256); }, AegisInvalidTagError,
+            assert.doesNotThrow(() => { pt = cipher(desc.key, desc.nonce).decrypt_detached(desc.ct, desc.tag256, desc.ad); }, AegisInvalidTagError,
                 `${name} testvector #${idx + 1} failed decryption w/ 256bit tag`);
             assert.deepStrictEqual(pt, desc.msg, `${name} testvector #${idx + 1} failed decryption w/ 256bit tag`);
         } else {
             let pt = null;
-            assert.throws(() => { pt = clazz.decrypt(desc.key, desc.nonce, desc.ct, desc.ad, desc.tag256); }, AegisInvalidTagError,
+            assert.throws(() => { pt = cipher(desc.key, desc.nonce).decrypt_detached(desc.ct, desc.tag256, desc.ad); }, AegisInvalidTagError,
                 `${name} testvector #${idx + 1} succeeded decryption w/ 256bit tag`);
             assert.deepStrictEqual(pt, desc.msg);
         }

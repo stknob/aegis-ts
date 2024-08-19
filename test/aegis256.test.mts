@@ -2,9 +2,9 @@ import { bytesToHex, hexToBytes, u32, u8 } from "@noble/ciphers/utils";
 import assert from "node:assert";
 import suite from "node:test";
 
-import { Aegis256 } from "../src/index.mjs";
+import { aegis256 } from "../src/index.mjs";
 import { runAegisTestVectors } from "./common.mjs";
-import { aegis256_update, Aegis256State } from "../src/_aegis.mjs";
+import { aegis256_update, Aegis256Blocks } from "../src/_aegis.mjs";
 
 suite("aegis256", async (s) => {
     await s.test("aegis256 update", () => {
@@ -28,7 +28,7 @@ suite("aegis256", async (s) => {
         ];
 
         const msg = u32(hexToBytes(message));
-        const inp = beforeState.map((v) => u32(hexToBytes(v))) as Aegis256State;
+        const inp = beforeState.map((v) => u32(hexToBytes(v))) as Aegis256Blocks;
         const out = aegis256_update(inp, msg, new Uint32Array(5)).map((v) => bytesToHex(u8(v)));
 
         assert.deepStrictEqual(afterState, out);
@@ -131,7 +131,7 @@ suite("aegis256", async (s) => {
             valid: false,
         }];
 
-        runAegisTestVectors("aegis256", Aegis256, AEGIS256_TEST_VECTORS);
+        runAegisTestVectors("aegis256", aegis256, AEGIS256_TEST_VECTORS);
     });
 
     await s.test("misaligned parameters", () => {
@@ -144,11 +144,13 @@ suite("aegis256", async (s) => {
         const tag256 = hexToBytes("0Fb7d28d0c3c0ebd409fd22b44160503073a547412da0854bfb9723020dab8da1a").subarray(1);
 
         assert.doesNotThrow(() => {
-            const [actual_ct, actual_tag] = Aegis256.encrypt(key, nonce, msg, ad);
+            const [actual_ct, actual_tag] = aegis256(key, nonce).encrypt_detached(msg, ad);
             assert.deepStrictEqual(actual_ct, ct, "ciphertext does not match expected");
             assert.deepStrictEqual(actual_tag, tag256, "encryption tag does not match expected");
-            const actual_msg = Aegis256.decrypt(key, nonce, ct, ad, tag256);
-            assert.deepStrictEqual(actual_msg, msg, "plaintext does not match expected");
+            const actual_msg256 = aegis256(key, nonce).decrypt_detached(ct, tag256, ad);
+            assert.deepStrictEqual(actual_msg256, msg, "plaintext does not match expected");
+            const actual_msg128 = aegis256(key, nonce).decrypt_detached(ct, tag128, ad);
+            assert.deepStrictEqual(actual_msg128, msg, "plaintext does not match expected");
         }, RangeError);
     });
 });
