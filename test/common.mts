@@ -1,5 +1,5 @@
 import assert from "node:assert";
-import { AegisInvalidTagError } from "../src/index.mjs";
+import { AegisInvalidTagError } from "../src/_aegis.mjs";
 
 export function runAegisTestVectors(name, cipher, vectors) {
     for (const [idx, desc] of vectors.entries()) {

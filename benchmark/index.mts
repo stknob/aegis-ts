@@ -1,5 +1,6 @@
 import * as bench from 'micro-bmark';
-import { aegis128l, aegis256 } from '../src/index.mjs';
+import { aegis128l } from '../src/aegis128l.mjs';
+import { aegis256 } from '../src/aegis256.mjs';
 import { MD5 } from '../src/md5.mjs';
 
 const PARAMS = [

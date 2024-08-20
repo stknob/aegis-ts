@@ -6,7 +6,7 @@
  *
  * License: MIT
  */
-import { clean } from "./_utils.mjs";
+import { clean } from "@noble/ciphers/utils";
 
 const POLY = 0x11b; // 1 + x + x**3 + x**4 + x**8
 
@@ -65,12 +65,12 @@ function genTtable(sbox: Uint8Array, fn: (n: number) => number) {
     return { T01, T23 };
 }
 
-export const tableEncoding = /* @__PURE__ */ genTtable(
+const tableEncoding = /* @__PURE__ */ genTtable(
     sbox,
     (s: number) => (mul(s, 3) << 24) | (s << 16) | (s << 8) | mul(s, 2)
 );
 
-export function apply0123(
+function apply0123(
     T01: Uint32Array,
     T23: Uint32Array,
     s0: number,

@@ -1,9 +1,5 @@
-import { AESRound, AESRoundResult } from "./_aes.mjs";
-
-export type Aegis256Blocks = [
-    Uint32Array, Uint32Array, Uint32Array, Uint32Array,
-    Uint32Array, Uint32Array
-];
+import { clean, copyBytes, equalBytes, isAligned32, u32 } from "@noble/ciphers/utils";
+import { AESRoundResult } from "./_aes.mjs";
 
 export function xor128(a: Uint32Array, b: Uint32Array, out: Uint32Array): Uint32Array {
     out[0] = a[0] ^ b[0];
@@ -21,35 +17,6 @@ export function set128(out: Uint32Array, inp: AESRoundResult): Uint32Array {
     return out;
 }
 
-/**
- * Aegis256 state update function, extracted for testability
- * @param blocks
- * @param msg
- * @returns
- */
-export function aegis256_update(blocks: Aegis256Blocks, msg: Uint32Array, tmp: Uint32Array): Aegis256Blocks {
-    const sm0 = AESRound(blocks[5], xor128(blocks[0], msg, tmp));
-    const sm1 = AESRound(blocks[0], blocks[1]);
-    const sm2 = AESRound(blocks[1], blocks[2]);
-    const sm3 = AESRound(blocks[2], blocks[3]);
-    const sm4 = AESRound(blocks[3], blocks[4]);
-    const sm5 = AESRound(blocks[4], blocks[5]);
-
-    set128(blocks[0], sm0);
-    set128(blocks[1], sm1);
-    set128(blocks[2], sm2);
-    set128(blocks[3], sm3);
-    set128(blocks[4], sm4);
-    set128(blocks[5], sm5);
-    return blocks;
-}
-
-
-export type Aegis128LBlocks = [
-    Uint32Array, Uint32Array, Uint32Array, Uint32Array,
-    Uint32Array, Uint32Array, Uint32Array, Uint32Array,
-];
-
 export function xor256(a: Uint32Array, b: Uint32Array, out: Uint32Array): Uint32Array {
     // first 128bit block
     out[0] = a[0] ^ b[0];
@@ -64,40 +31,130 @@ export function xor256(a: Uint32Array, b: Uint32Array, out: Uint32Array): Uint32
     return out;
 }
 
+export type AegisCipher = {
+    encrypt(plaintext: Uint8Array, ad?: Uint8Array): Uint8Array
+    decrypt(ciphertext: Uint8Array, ad?: Uint8Array): Uint8Array,
+    encrypt_detached(plaintext: Uint8Array, ad?: Uint8Array): [Uint8Array, Uint8Array],
+    decrypt_detached(ciphertext: Uint8Array, tag: Uint8Array, ad?: Uint8Array): Uint8Array,
+};
 
-/**
- * Aegis128L state update function with single 256bit input block, extracted for testability
- * @param blocks
- * @param msg
- * @returns
- */
-export function aegis128l_update1(blocks: Aegis128LBlocks, msg: Uint32Array, tmp: Uint32Array): Aegis128LBlocks {
-    return aegis128l_update2(blocks, msg.subarray(0, 4), msg.subarray(4, 8), tmp);
+export interface AegisCipherOptions {
+    tagLength?: number,
+};
+
+export interface AegisState {
+    blockSize: number;
+
+    init(key: Uint8Array, nonce: Uint8Array): this;
+    absorb(ai: Uint32Array);
+    absorbPartial(ai: Uint8Array);
+    encBlock(xi: Uint32Array, out: Uint32Array): Uint32Array;
+    encPartial(xi: Uint8Array, out: Uint8Array): Uint8Array;
+    decBlock(ci: Uint32Array, out: Uint32Array): Uint32Array;
+    decPartial(ci: Uint8Array, out: Uint8Array): Uint8Array;
+    finalize(ad_len: number, msg_len: number, tag_len: number): Uint8Array;
 }
 
-/**
- * Aegis128L state update function with two 128bit input blocks, extracted for testability
- * @param blocks
- * @param msg
- * @returns
- */
-export function aegis128l_update2(blocks: Aegis128LBlocks, m0: Uint32Array, m1: Uint32Array, tmp: Uint32Array): Aegis128LBlocks {
-    const sm0 = AESRound(blocks[7], xor128(blocks[0], m0, tmp));
-    const sm1 = AESRound(blocks[0], blocks[1]);
-    const sm2 = AESRound(blocks[1], blocks[2]);
-    const sm3 = AESRound(blocks[2], blocks[3]);
-    const sm4 = AESRound(blocks[3], xor128(blocks[4], m1, tmp));
-    const sm5 = AESRound(blocks[4], blocks[5]);
-    const sm6 = AESRound(blocks[5], blocks[6]);
-    const sm7 = AESRound(blocks[6], blocks[7]);
 
-    set128(blocks[0], sm0);
-    set128(blocks[1], sm1);
-    set128(blocks[2], sm2);
-    set128(blocks[3], sm3);
-    set128(blocks[4], sm4);
-    set128(blocks[5], sm5);
-    set128(blocks[6], sm6);
-    set128(blocks[7], sm7);
-    return blocks;
+// C0: 0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x08, 0x0d, 0x15, 0x22, 0x37, 0x59, 0x90, 0xe9, 0x79, 0x62
+export const C0 = Uint32Array.of(0x02010100, 0x0d080503, 0x59372215, 0x6279e990);
+// C1: 0xdb, 0x3d, 0x18, 0x55, 0x6d, 0xc2, 0x2f, 0xf1, 0x20, 0x11, 0x31, 0x42, 0x73, 0xb5, 0x28, 0xdd
+export const C1 = Uint32Array.of(0x55183ddb, 0xf12fc26d, 0x42311120, 0xdd28b573);
+
+export class AegisInvalidTagError extends Error {
+    constructor() { super("Aegis decryption failed") }
+    get name() { return this.constructor.name; }
+}
+
+export const aegis_encrypt_detached = (state: AegisState, pt: Uint8Array, ad?: Uint8Array, tag_len: number = 32): [Uint8Array, Uint8Array] => {
+    const toClean = [];
+    if (!isAligned32(pt)) toClean.push((pt = copyBytes(pt)));
+    const src32 = u32(pt);
+
+    const ct = new Uint8Array(pt.length);
+    const dst32 = u32(ct);
+
+    const blockSizeU8  = state.blockSize;
+    const blockSizeU32 = blockSizeU8 >> 2;
+
+    const ad_len = ad?.length || 0;
+    if (ad_len) {
+        if (!isAligned32(ad)) toClean.push((ad = copyBytes(ad)));
+        const ad32 = u32(ad);
+
+        let ad_pos = 0;
+        const ad_blocks = Math.floor(ad_len / blockSizeU8);
+        for (let i = 0, off = 0; i < ad_blocks; i++) {
+            const block = ad32.subarray(off, off + blockSizeU32)
+            state.absorb(block);
+            ad_pos += blockSizeU8; off += blockSizeU32;
+        }
+        if (ad_pos < ad_len) {
+            state.absorbPartial(ad.subarray(ad_pos, ad_len));
+        }
+    }
+
+    let pt_pos = 0;
+    const pt_len    = pt.length;
+    const pt_blocks = Math.floor(pt_len / blockSizeU8);
+    for (let i = 0, off = 0; i < pt_blocks; i++) {
+        state.encBlock(src32.subarray(off, off + blockSizeU32), dst32.subarray(off, off + blockSizeU32));
+        pt_pos += blockSizeU8; off += blockSizeU32;
+    }
+    if (pt_pos < pt_len) {
+        state.encPartial(pt.subarray(pt_pos, pt_len), ct.subarray(pt_pos));
+    }
+
+    const tag = state.finalize(ad_len, pt_len, tag_len);
+    clean(...toClean);
+    return [ct, tag];
+}
+
+export const aegis_decrypt_detached = (state: AegisState, ct: Uint8Array, tag: Uint8Array, ad?: Uint8Array): Uint8Array => {
+    const toClean = [];
+    if (!isAligned32(ct)) toClean.push((ct = copyBytes(ct)));
+    const src32 = u32(ct);
+
+    const blockSizeU8  = state.blockSize;
+    const blockSizeU32 = blockSizeU8 >> 2;
+
+    const msg = new Uint8Array(ct.length);
+    const dst32 = u32(msg);
+
+    const ad_len = ad?.length;
+    if (ad_len) {
+        if (!isAligned32(ad)) toClean.push((ad = copyBytes(ad)));
+        const ad32  = u32(ad);
+
+        let ad_pos = 0;
+        const ad_blocks = Math.floor(ad_len / blockSizeU8);
+        for (let i = 0, off = 0; i < ad_blocks; i++) {
+            const block = ad32.subarray(off, off + blockSizeU32)
+            state.absorb(block);
+            ad_pos += blockSizeU8; off += blockSizeU32;
+        }
+        if (ad_pos < ad_len) {
+            state.absorbPartial(ad.subarray(ad_pos, ad_len));
+        }
+    }
+
+    let ct_pos = 0;
+    const ct_len    = ct.length;
+    const ct_blocks = Math.floor(ct_len / blockSizeU8);
+    for (let i = 0, off = 0; i < ct_blocks; i++) {
+        state.decBlock(src32.subarray(off, off + blockSizeU32), dst32.subarray(off, off + blockSizeU32));
+        ct_pos += blockSizeU8; off += blockSizeU32;
+    }
+    if (ct_pos < ct_len) {
+        state.decPartial(ct.subarray(ct_pos, ct_len), msg.subarray(ct_pos));
+    }
+
+    const calculatedTag = state.finalize(ad_len, ct_len, tag.length);
+    if (!equalBytes(tag, calculatedTag)) {
+        clean(dst32, ...toClean); // Wipe plaintext
+        throw new AegisInvalidTagError();
+    }
+
+    clean(...toClean);
+    return msg;
 }

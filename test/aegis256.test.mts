@@ -2,9 +2,8 @@ import { bytesToHex, hexToBytes, u32, u8 } from "@noble/ciphers/utils";
 import assert from "node:assert";
 import suite from "node:test";
 
-import { aegis256 } from "../src/index.mjs";
+import { aegis256, aegis256_update, Aegis256Blocks } from "../src/aegis256.mjs";
 import { runAegisTestVectors } from "./common.mjs";
-import { aegis256_update, Aegis256Blocks } from "../src/_aegis.mjs";
 
 suite("aegis256", async (s) => {
     await s.test("aegis256 update", () => {

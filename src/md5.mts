@@ -1,5 +1,4 @@
-import { copyBytes, isAligned32 } from "@noble/ciphers/utils";
-import { clean, u32, u8 } from "./_utils.mjs";
+import { clean, copyBytes, isAligned32, u32, u8 } from "@noble/ciphers/utils";
 
 // M5 Constants in LE
 const MD5_REG_CONSTS = Uint32Array.from([
