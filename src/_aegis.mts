@@ -151,7 +151,7 @@ export const aegis_decrypt_detached = (state: AegisState, ct: Uint8Array, tag: U
 
     const calculatedTag = state.finalize(ad_len, ct_len, tag.length);
     if (!equalBytes(tag, calculatedTag)) {
-        clean(dst32, ...toClean); // Wipe plaintext
+        clean(dst32, calculatedTag, ...toClean); // Wipe plaintext
         throw new AegisInvalidTagError();
     }
 
