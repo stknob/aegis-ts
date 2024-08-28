@@ -3,7 +3,7 @@ import assert from "node:assert";
 import suite from "node:test";
 
 import { aegis128l, aegis128l_update2, Aegis128LBlocks } from "../src/aegis128l.mjs";
-import { runAegisTestVectors } from "./common.mjs";
+import { AegisTestVectorDesc, runAegisTestVectors } from "./common.mjs";
 
 suite("aegis128l", async (s) => {
     await s.test("aegis128l update", () => {
@@ -38,7 +38,7 @@ suite("aegis128l", async (s) => {
     });
 
     await s.test("aegis128l test vectors", () => {
-        const AEGIS128L_TEST_VECTORS = [{
+        const AEGIS128L_TEST_VECTORS: AegisTestVectorDesc[] = [{
             // Aegis128L testvector #1
             key:    hexToBytes("10010000000000000000000000000000"),
             nonce:  hexToBytes("10000200000000000000000000000000"),

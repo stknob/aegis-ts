@@ -1,21 +1,54 @@
 {
-  "name": "poc-aegis",
+  "name": "aegis-ts",
   "version": "0.0.0",
   "type": "module",
-  "private": true,
+  "description": "TypeScript implementation of Aegis128L and Aegis256",
+  "author": {
+    "email": "stkn@bitplumber.de",
+    "name": "Stefan Knoblich"
+  },
+  "homepage": "https://github.com/stknob/aegis-ts",
+  "keywords": ["aegis", "aegis128l", "aegis256", "typescript"],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stknob/aegis-ts.git"
+  },
+  "bugs": {
+    "url": "https://github.com/stknob/aegis-ts/issues"
+  },
+  "dependencies": {
+    "@noble/ciphers": "0.6.0"
+  },
   "devDependencies": {
+    "@arethetypeswrong/cli": "0.15.4",
     "@types/node": "20.14.15",
-    "@noble/ciphers": "0.6.0",
     "micro-bmark": "0.3.1",
     "glob": "11.0.0",
-    "ts-node": "10.9.2",
+    "tsx": "4.19.0",
+    "tsup": "8.2.4",
     "typescript": "5.5.4"
   },
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    "./package.json": "./package.json",
+    "./aegis128l.js": {
+        "import": "./dist/aegis128l.js",
+        "default": "./dist/aegis128l.cjs"
+    },
+    "./aegis256.js": {
+        "import": "./dist/aegis256.js",
+        "default": "./dist/aegis256.cjs"
+    }
+  },
   "scripts": {
-    "build": "npx tsc",
-    "run": "node --loader ts-node/esm src/index.mts",
-    "test": "node --loader ts-node/esm test/index.mts",
-    "prof": "node --prof --loader ts-node/esm src/index.mts",
-    "bench": "node --loader ts-node/esm benchmark/index.mts"
+    "build": "tsup",
+    "lint": "tsc",
+    "test": "tsx test/index.mts",
+    "prof": "tsx --prof src/index.mts",
+    "bench": "tsx benchmark/index.mts",
+    "ci": "yarn run build && yarn run lint && yarn run test && yarn run check-exports",
+    "check-exports": "attw --pack ."
   }
 }

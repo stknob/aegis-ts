@@ -1,5 +1,5 @@
 import { clean, copyBytes, equalBytes, isAligned32, u32 } from "@noble/ciphers/utils";
-import { AESRoundResult } from "./_aes.mjs";
+import { type AESRoundResult } from "./_aes.mjs";
 
 // C0: 0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x08, 0x0d, 0x15, 0x22, 0x37, 0x59, 0x90, 0xe9, 0x79, 0x62
 export const C0 = Uint32Array.of(0x02010100, 0x0d080503, 0x59372215, 0x6279e990);
@@ -37,7 +37,7 @@ export function xor256(a: Uint32Array, b: Uint32Array, out: Uint32Array): Uint32
 }
 
 export type AegisCipher = {
-    encrypt(plaintext: Uint8Array, ad?: Uint8Array): Uint8Array
+    encrypt(plaintext: Uint8Array, ad?: Uint8Array): Uint8Array,
     decrypt(ciphertext: Uint8Array, ad?: Uint8Array): Uint8Array,
     encrypt_detached(plaintext: Uint8Array, ad?: Uint8Array): [Uint8Array, Uint8Array],
     decrypt_detached(ciphertext: Uint8Array, tag: Uint8Array, ad?: Uint8Array): Uint8Array,
@@ -51,8 +51,8 @@ export interface AegisState {
     blockSize: number;
 
     init(key: Uint8Array, nonce: Uint8Array): this;
-    absorb(ai: Uint32Array);
-    absorbPartial(ai: Uint8Array);
+    absorb(ai: Uint32Array): void;
+    absorbPartial(ai: Uint8Array): void;
     encBlock(xi: Uint32Array, out: Uint32Array): Uint32Array;
     encPartial(xi: Uint8Array, out: Uint8Array): Uint8Array;
     decBlock(ci: Uint32Array, out: Uint32Array): Uint32Array;
@@ -62,7 +62,7 @@ export interface AegisState {
 
 export class AegisInvalidTagError extends Error {
     constructor() { super("Aegis decryption failed") }
-    get name() { return this.constructor.name; }
+    override get name() { return this.constructor.name; }
 }
 
 export const aegis_encrypt_detached = (state: AegisState, pt: Uint8Array, ad?: Uint8Array, tag_len: number = 32): [Uint8Array, Uint8Array] => {
@@ -77,7 +77,7 @@ export const aegis_encrypt_detached = (state: AegisState, pt: Uint8Array, ad?: U
     const blockSizeU32 = blockSizeU8 >> 2;
 
     const ad_len = ad?.length || 0;
-    if (ad_len) {
+    if (ad && ad_len) {
         if (!isAligned32(ad)) toClean.push((ad = copyBytes(ad)));
         const ad32 = u32(ad);
 
@@ -120,8 +120,8 @@ export const aegis_decrypt_detached = (state: AegisState, ct: Uint8Array, tag: U
     const msg = new Uint8Array(ct.length);
     const dst32 = u32(msg);
 
-    const ad_len = ad?.length;
-    if (ad_len) {
+    const ad_len = ad?.length || 0;
+    if (ad && ad_len) {
         if (!isAligned32(ad)) toClean.push((ad = copyBytes(ad)));
         const ad32  = u32(ad);
 

@@ -1,11 +1,20 @@
 import { isAligned32, concatBytes, copyBytes, wrapCipher, clean, u32, u8 } from "@noble/ciphers/utils";
-import { aegis_decrypt_detached, aegis_encrypt_detached, AegisCipher, AegisCipherOptions, AegisState, C0, C1, set128, xor128 } from "./_aegis.mjs";
+import { aegis_decrypt_detached, aegis_encrypt_detached, type AegisCipher, type AegisCipherOptions, type AegisState, C0, C1, set128, xor128 } from "./_aegis.mjs";
 import { u64BitLengths } from "./_utils.mjs";
 import { AESRound } from "./_aes.mjs";
 
 export type Aegis256Blocks = [
     Uint32Array, Uint32Array, Uint32Array, Uint32Array,
     Uint32Array, Uint32Array
+];
+
+const DUMMY_BLOCKS: Aegis256Blocks = [
+    Uint32Array.of(0, 0, 0, 0),
+    Uint32Array.of(0, 0, 0, 0),
+    Uint32Array.of(0, 0, 0, 0),
+    Uint32Array.of(0, 0, 0, 0),
+    Uint32Array.of(0, 0, 0, 0),
+    Uint32Array.of(0, 0, 0, 0),
 ];
 
 /**
@@ -32,7 +41,7 @@ export function aegis256_update(blocks: Aegis256Blocks, msg: Uint32Array, tmp: U
 }
 
 class Aegis256State implements AegisState {
-    #blocks: Aegis256Blocks;
+    #blocks: Aegis256Blocks = DUMMY_BLOCKS;
     #tmpBlock32 = new Uint32Array(4);   // Scratch buffer for generic operations e.g. xor128 and ZeroPad()
     #tmpBlock8  = u8(this.#tmpBlock32); // Uint8Array view into generic scratch buffer for ZeroPad()
     #sBlock32 = new Uint32Array(4);     // Scratch buffer for aegis256_update
