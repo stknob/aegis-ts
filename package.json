@@ -1,6 +1,6 @@
 {
   "name": "aegis-ts",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "type": "module",
   "description": "TypeScript implementation of Aegis128L and Aegis256",
   "license": "MIT",
@@ -9,7 +9,12 @@
     "name": "Stefan Knoblich"
   },
   "homepage": "https://github.com/stknob/aegis-ts",
-  "keywords": ["aegis", "aegis128l", "aegis256", "typescript"],
+  "keywords": [
+    "aegis",
+    "aegis128l",
+    "aegis256",
+    "typescript"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/stknob/aegis-ts.git"
@@ -23,10 +28,10 @@
   "devDependencies": {
     "@arethetypeswrong/cli": "0.15.4",
     "@types/node": "20.14.15",
-    "micro-bmark": "0.3.1",
     "glob": "11.0.0",
-    "tsx": "4.19.0",
+    "micro-bmark": "0.3.1",
     "tsup": "8.2.4",
+    "tsx": "4.19.0",
     "typescript": "5.5.4"
   },
   "files": [
@@ -35,12 +40,12 @@
   "exports": {
     "./package.json": "./package.json",
     "./aegis128l.js": {
-        "import": "./dist/aegis128l.js",
-        "default": "./dist/aegis128l.cjs"
+      "import": "./dist/aegis128l.js",
+      "default": "./dist/aegis128l.cjs"
     },
     "./aegis256.js": {
-        "import": "./dist/aegis256.js",
-        "default": "./dist/aegis256.cjs"
+      "import": "./dist/aegis256.js",
+      "default": "./dist/aegis256.cjs"
     }
   },
   "scripts": {
