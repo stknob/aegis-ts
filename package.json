@@ -1,6 +1,6 @@
 {
   "name": "aegis-ts",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "type": "module",
   "description": "TypeScript implementation of Aegis128L and Aegis256",
   "license": "MIT",
