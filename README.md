@@ -1,4 +1,4 @@
-## Proof of Concept TypeScript implementation of Aegis128L and Aegis256
+## TypeScript implementation of Aegis128L and Aegis256
 
 Using utility and low-level AES function from Paul Miller's [noble-ciphers](https://github.com/paulmillr/noble-ciphers).
 
