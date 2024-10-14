@@ -2,7 +2,7 @@
 
 Using utility and low-level AES function from Paul Miller's [noble-ciphers](https://github.com/paulmillr/noble-ciphers).
 
-Passes all testvectors from the current [draft spec 11](https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-aegis-aead-11).
+Passes all testvectors from the current [draft spec 13](https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-aegis-aead-13).
 
 Use at your own risk!
 
