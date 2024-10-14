@@ -7,7 +7,8 @@ import { AegisTestVectorDesc, runAegisTestVectors } from "./common.mjs";
 
 suite("aegis128l", async (s) => {
     await s.test("aegis128l update", () => {
-        const message = "033e6975b94816879e42917650955aa0";
+        const message0 = "033e6975b94816879e42917650955aa0";
+        const message1 = "fcc1968a46b7e97861bd6e89af6aa55f";
         const beforeState = [
             "9b7e60b24cc873ea894ecc07911049a3",
             "330be08f35300faa2ebf9a7b0d274658",
@@ -24,15 +25,16 @@ suite("aegis128l", async (s) => {
             "790394041a3d26ab697bde865014652d",
             "38cf49e4b65248acd533041b64dd0611",
             "16d8e58748f437bfff1797f780337cee",
-            "69761320f7dd738b281cc9f335ac2f5a",
+            "9689ecdf08228c74d7e3360cca53d0a5",
             "a21746bb193a569e331e1aa985d0d729",
             "09d714e6fcf9177a8ed1cde7e3d259a6",
             "61279ba73167f0ab76f0a11bf203bdff",
         ];
 
-        const msg = u32(hexToBytes(message));
+        const msg0 = u32(hexToBytes(message0));
+        const msg1 = u32(hexToBytes(message1));
         const inp = beforeState.map((v) => u32(hexToBytes(v))) as Aegis128LBlocks;
-        const out = aegis128l_update2(inp, msg, msg, new Uint32Array(8)).map((v) => bytesToHex(u8(v)));
+        const out = aegis128l_update2(inp, msg0, msg1, new Uint32Array(8)).map((v) => bytesToHex(u8(v)));
 
         assert.deepStrictEqual(afterState, out);
     });
