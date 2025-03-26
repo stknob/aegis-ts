@@ -847,10 +847,10 @@ merge2@^1.3.0, merge2@^1.4.1:
   resolved "https://registry.yarnpkg.com/merge2/-/merge2-1.4.1.tgz#4368892f885e907455a6fd7dc55c0c9d404990ae"
   integrity sha512-8q7VEgMJW4J8tcfVPy8g09NcQwZdbwFEqhe/WZkoIzjn/3TGDwtOCYtXGxA3O8tPzpczCCDgv+P2P5y00ZJOOg==
 
-micro-bmark@0.3.1:
-  version "0.3.1"
-  resolved "https://registry.yarnpkg.com/micro-bmark/-/micro-bmark-0.3.1.tgz#1ba5289c01dd06ec06fb185ef1f859258d10e5ba"
-  integrity sha512-bNaKObD4yPAAPrpEqp5jO6LJ2sEFgLoFSmRjEY809mJ62+2AehI/K3+RlVpN3Oo92RHpgC2RQhj6b1Tb4dmo+w==
+micro-bmark@0.4.0:
+  version "0.4.0"
+  resolved "https://registry.npmjs.org/micro-bmark/-/micro-bmark-0.4.0.tgz#fa9323668eb93eaebfdededbffb0fd7d0b7a60fc"
+  integrity sha512-lQHxIE9BurlmqBR3J4NJnUH6I72kChBYXuBeNkvNT3viFHKfYj2c070OysLZwtjBTxTjIgsUqjgcttMWlmASVA==
 
 micromatch@^4.0.4:
   version "4.0.8"
