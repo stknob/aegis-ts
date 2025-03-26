@@ -26,13 +26,13 @@
     "@noble/ciphers": "1.0.0"
   },
   "devDependencies": {
-    "@arethetypeswrong/cli": "0.15.4",
-    "@types/node": "20.14.15",
-    "glob": "11.0.0",
+    "@arethetypeswrong/cli": "0.17.4",
+    "@types/node": "20.17.27",
+    "glob": "11.0.1",
     "micro-bmark": "0.4.0",
-    "tsup": "8.2.4",
-    "tsx": "4.19.0",
-    "typescript": "5.5.4"
+    "tsup": "8.4.0",
+    "tsx": "4.19.3",
+    "typescript": "5.8.2"
   },
   "files": [
     "dist"
