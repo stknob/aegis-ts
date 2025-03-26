@@ -55,6 +55,6 @@
     "prof": "tsx --prof src/index.mts",
     "bench": "tsx benchmark/index.mts",
     "ci": "yarn run build && yarn run lint && yarn run test && yarn run check-exports",
-    "check-exports": "attw --pack ."
+    "check-exports": "attw --pack --profile node16 ."
   }
 }
