@@ -149,12 +149,12 @@ suite("aegis128l", async (s) => {
         const tag256 = hexToBytes("0F022cb796fe7e0ae1197525ff67e309484cfbab6528ddef89f17d74ef8ecd82b3").subarray(1);
 
         assert.doesNotThrow(() => {
-            const [actual_ct, actual_tag] = aegis128l(key, nonce).encrypt_detached(msg, ad);
+            const [actual_ct, actual_tag] = aegis128l(key, nonce, ad).encryptDetached(msg);
             assert.deepStrictEqual(actual_ct, ct, "ciphertext does not match expected");
             assert.deepStrictEqual(actual_tag, tag256, "encryption tag does not match expected");
-            const actual_msg256 = aegis128l(key, nonce).decrypt_detached(ct, tag256, ad);
+            const actual_msg256 = aegis128l(key, nonce, ad).decryptDetached(ct, tag256);
             assert.deepStrictEqual(actual_msg256, msg, "plaintext does not match expected");
-            const actual_msg128 = aegis128l(key, nonce).decrypt_detached(ct, tag128, ad);
+            const actual_msg128 = aegis128l(key, nonce, ad).decryptDetached(ct, tag128);
             assert.deepStrictEqual(actual_msg128, msg, "plaintext does not match expected");
         }, RangeError);
     });

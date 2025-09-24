@@ -1,6 +1,6 @@
-import { isAligned32, concatBytes, copyBytes, wrapCipher, clean, u32, u8 } from "@noble/ciphers/utils";
-import { aegis_decrypt_detached, aegis_encrypt_detached, type AegisCipher, type AegisCipherOptions, type AegisState, C0, C1, set128, xor128 } from "./_aegis.mjs";
-import { u64BitLengths } from "./_utils.mjs";
+import { isAligned32, concatBytes, copyBytes, clean, u32, u8 } from "@noble/ciphers/utils";
+import { aegis_decrypt_detached, aegis_encrypt_detached, type AegisState, C0, C1, set128, xor128 } from "./_aegis.mjs";
+import { u64BitLengths, wrapAegisCipher, type AegisCipher, type AegisCipherOptions } from "./_utils.mjs";
 import { AESRound } from "./_aes.mjs";
 
 export type Aegis256Blocks = [
@@ -186,27 +186,31 @@ class Aegis256State implements AegisState {
     }
 }
 
-export const aegis256 = /* @__PURE__ */ wrapCipher({
-    nonceLength: 32,
-    tagLength: 32,
-    blockSize: 16,
-}, (key: Uint8Array, nonce: Uint8Array, options?: AegisCipherOptions): AegisCipher => {
-    const tagLength = options?.tagLength || 32;
-    if (![16, 32].includes(tagLength)) throw new Error("Invalid tag length, 16 or 32 bytes expected");
-    const state = new Aegis256State().init(key, nonce);
-    return {
-        encrypt(pt: Uint8Array, aad?: Uint8Array): Uint8Array {
-            const [ct, tag] = aegis_encrypt_detached(state, pt, aad, tagLength);
-            return concatBytes(ct, tag);
-        },
-        encrypt_detached(pt: Uint8Array, aad?: Uint8Array): [Uint8Array, Uint8Array] {
-            return aegis_encrypt_detached(state, pt, aad, tagLength);
-        },
-        decrypt(ct: Uint8Array, aad?: Uint8Array): Uint8Array {
-            return aegis_decrypt_detached(state, ct.subarray(0, -tagLength), ct.subarray(-tagLength), aad);
-        },
-        decrypt_detached(ct: Uint8Array, tag: Uint8Array, aad?: Uint8Array): Uint8Array {
-            return aegis_decrypt_detached(state, ct, tag, aad);
-        }
-    };
-});
+export const aegis256: ((key: Uint8Array, nonce: Uint8Array, AAD?: Uint8Array, options?: AegisCipherOptions) => AegisCipher) & {
+    nonceLength: number,
+    tagLength: number,
+    blockSize: number,
+    varSizeNonce: boolean,
+} = /* @__PURE__ */ wrapAegisCipher(
+    { nonceLength: 32, tagLength: 32, blockSize: 16, varSizeNonce: false },
+    function (key: Uint8Array, nonce: Uint8Array, AAD?: Uint8Array, options?: AegisCipherOptions): AegisCipher {
+        const tagLength = options?.tagLength || 32;
+        if (![16, 32].includes(tagLength)) throw new Error("Invalid tag length, 16 or 32 bytes expected");
+        const state = new Aegis256State().init(key, nonce);
+        return {
+            encrypt(plaintext: Uint8Array): Uint8Array {
+                const [ct, tag] = aegis_encrypt_detached(state, plaintext, AAD, tagLength);
+                return concatBytes(ct, tag);
+            },
+            encryptDetached(plaintext: Uint8Array): [Uint8Array, Uint8Array] {
+                return aegis_encrypt_detached(state, plaintext, AAD, tagLength);
+            },
+            decrypt(ciphertext: Uint8Array): Uint8Array {
+                return aegis_decrypt_detached(state, ciphertext.subarray(0, -tagLength), ciphertext.subarray(-tagLength), AAD);
+            },
+            decryptDetached(ciphertext: Uint8Array, tag: Uint8Array): Uint8Array {
+                return aegis_decrypt_detached(state, ciphertext, tag, AAD);
+            }
+        };
+    }
+);

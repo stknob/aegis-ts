@@ -23,7 +23,7 @@
     "url": "https://github.com/stknob/aegis-ts/issues"
   },
   "dependencies": {
-    "@noble/ciphers": "1.0.0"
+    "@noble/ciphers": "1.3.0"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "0.17.4",
