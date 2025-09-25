@@ -38,15 +38,8 @@
     "dist"
   ],
   "exports": {
-    "./package.json": "./package.json",
-    "./aegis128l.js": {
-      "import": "./dist/aegis128l.js",
-      "default": "./dist/aegis128l.cjs"
-    },
-    "./aegis256.js": {
-      "import": "./dist/aegis256.js",
-      "default": "./dist/aegis256.cjs"
-    }
+    "./aegis128l.js": "./dist/aegis128l.js",
+    "./aegis256.js": "./dist/aegis256.js"
   },
   "scripts": {
     "build": "tsup",
@@ -55,6 +48,6 @@
     "prof": "tsx --prof src/index.mts",
     "bench": "tsx benchmark/index.mts",
     "ci": "yarn run build && yarn run lint && yarn run test && yarn run check-exports",
-    "check-exports": "attw --pack --profile node16 ."
+    "check-exports": "attw --pack --profile esm-only ."
   }
 }
