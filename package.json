@@ -49,5 +49,8 @@
     "bench": "tsx benchmark/index.mts",
     "ci": "yarn run build && yarn run lint && yarn run test && yarn run check-exports",
     "check-exports": "attw --pack --profile esm-only ."
+  },
+  "engines": {
+    "node": ">= 20.19.0"
   }
 }
