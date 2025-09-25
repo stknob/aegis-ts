@@ -6,7 +6,7 @@
  *
  * License: MIT
  */
-import { clean } from "@noble/ciphers/utils";
+import { clean } from "@noble/ciphers/utils.js";
 
 const POLY = 0x11b; // 1 + x + x**3 + x**4 + x**8
 

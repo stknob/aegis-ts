@@ -1,4 +1,4 @@
-import { clean, copyBytes, equalBytes, isAligned32, u32, type Cipher } from "@noble/ciphers/utils";
+import { clean, copyBytes, equalBytes, isAligned32, u32 } from "@noble/ciphers/utils.js";
 import { type AESRoundResult } from "./_aes.mjs";
 
 // C0: 0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x08, 0x0d, 0x15, 0x22, 0x37, 0x59, 0x90, 0xe9, 0x79, 0x62

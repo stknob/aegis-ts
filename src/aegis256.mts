@@ -1,4 +1,4 @@
-import { isAligned32, concatBytes, copyBytes, clean, u32, u8 } from "@noble/ciphers/utils";
+import { isAligned32, concatBytes, copyBytes, clean, u32, u8 } from "@noble/ciphers/utils.js";
 import { aegis_decrypt_detached, aegis_encrypt_detached, type AegisState, C0, C1, set128, xor128 } from "./_aegis.mjs";
 import { u64BitLengths, wrapAegisCipher, type AegisCipher, type AegisCipherOptions } from "./_utils.mjs";
 import { AESRound } from "./_aes.mjs";

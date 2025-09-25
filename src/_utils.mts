@@ -6,13 +6,13 @@
  *
  * License: MIT
  */
-import { abytes, createView, isLE, setBigUint64, type Cipher, type CipherParams } from "@noble/ciphers/utils";
+import { abytes, createView, isLE, type Cipher, type CipherParams } from "@noble/ciphers/utils.js";
 
 export const u64BitLengths = (ad_nbits: bigint, ct_nbits: bigint) => {
     const num = new Uint8Array(16);
     const view = createView(num);
-    setBigUint64(view, 0, ad_nbits, true);
-    setBigUint64(view, 8, ct_nbits, true);
+    view.setBigUint64(0, ad_nbits, true);
+    view.setBigUint64(8, ct_nbits, true);
     return num;
 };
 

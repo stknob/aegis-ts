@@ -1,4 +1,4 @@
-import { hexToBytes, u32, u8 } from "@noble/ciphers/utils";
+import { hexToBytes, u32, u8 } from "@noble/ciphers/utils.js";
 import assert from "node:assert";
 import suite from "node:test";
 

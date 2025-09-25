@@ -1,7 +1,7 @@
 import assert from "node:assert";
 import { AegisInvalidTagError } from "../src/_aegis.mjs";
 import { type AegisCipher, type AegisCipherOptions } from "../src/_utils.mts";
-import { concatBytes } from "@noble/ciphers/utils";
+import { concatBytes } from "@noble/ciphers/utils.js";
 
 export interface AegisTestVectorDesc {
     key: Uint8Array,
